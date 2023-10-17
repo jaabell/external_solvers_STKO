@@ -40,7 +40,7 @@ def makeXObjectMetaData():
 		html_end()
 		)
 	at_ModelType.sourceType = MpcAttributeSourceType.List
-	at_ModelType.setSourceList(['U (Displacement)', 'U-P (Displacement+Pressure)', 'U-R (Displacement+Rotation)'])
+	at_ModelType.setSourceList(['U (Displacement)', 'U-P (Displacement+Pressure)', 'U-R (Displacement+Rotation)', 'T (Temperature)'])
 	at_ModelType.setDefault('U (Displacement)')
 	
 	# InputType
@@ -150,6 +150,19 @@ def makeXObjectMetaData():
 		html_end()
 		)
 	at_UR.editable = False
+
+	# Temperature
+	at_Temperature = MpcAttributeMetaData()
+	at_Temperature.type = MpcAttributeType.Boolean
+	at_Temperature.name = 'T (Temperature)'
+	at_Temperature.group = 'Options'
+	at_Temperature.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('T (Temperature)')+'<br/>') + 
+		html_par('') +
+		html_end()
+		)
+	at_Temperature.editable = False
 	
 	# Ux
 	at_Ux_flag = MpcAttributeMetaData()
@@ -411,6 +424,43 @@ def makeXObjectMetaData():
 		)
 	
 	# ctype
+	at_Temperature_flag = MpcAttributeMetaData()
+	at_Temperature_flag.type = MpcAttributeType.Boolean
+	at_Temperature_flag.name = 'Temperature'
+	at_Temperature_flag.group = 'Values'
+	at_Temperature_flag.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('Temperature')+'<br/>') + 
+		html_par('Toggle to prescribe a value for Temperature DOF') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Sp_Command','Sp Command')+'<br/>') +
+		html_end()
+		)
+
+	at_Temperature_val = MpcAttributeMetaData()
+	at_Temperature_val.type = MpcAttributeType.Real
+	at_Temperature_val.name = 'Temperature value'
+	at_Temperature_val.group = 'Values'
+	at_Temperature_val.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('Temperature value')+'<br/>') + 
+		html_par('Prescribed value for Temperature DOF') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Sp_Command','Sp Command')+'<br/>') +
+		html_end()
+		)
+	
+	at_Temperature_fun = MpcAttributeMetaData()
+	at_Temperature_fun.type = MpcAttributeType.String
+	at_Temperature_fun.name = 'Temperature function'
+	at_Temperature_fun.group = 'Values'
+	at_Temperature_fun.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('Temperature function')+'<br/>') + 
+		html_par('Prescribed value for Temperature DOF') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Sp_Command','Sp Command')+'<br/>') +
+		html_end()
+		)
+	
+	# ctype
 	at_ctype = MpcAttributeMetaData()
 	at_ctype.type = MpcAttributeType.Integer
 	at_ctype.visible = False;
@@ -436,6 +486,7 @@ def makeXObjectMetaData():
 	xom.addAttribute(at_U)
 	xom.addAttribute(at_UP)
 	xom.addAttribute(at_UR)
+	xom.addAttribute(at_Temperature)
 	xom.addAttribute(at_Constant)
 	xom.addAttribute(at_Function)
 	xom.addAttribute(at_Ux_flag)
@@ -459,6 +510,9 @@ def makeXObjectMetaData():
 	xom.addAttribute(at_P_flag)
 	xom.addAttribute(at_P_val)
 	xom.addAttribute(at_P_fun)
+	xom.addAttribute(at_Temperature_flag)
+	xom.addAttribute(at_Temperature_val)
+	xom.addAttribute(at_Temperature_fun)
 	xom.addAttribute(at_ctype)
 	
 	
@@ -481,6 +535,11 @@ def makeXObjectMetaData():
 	xom.setVisibilityDependency(at_UR, at_Rz_fun)
 	
 	# 3D
+	xom.setVisibilityDependency(at_Temperature, at_Temperature_flag)
+	xom.setVisibilityDependency(at_Temperature, at_Temperature_val)
+	xom.setVisibilityDependency(at_Temperature, at_Temperature_fun)
+	
+	# 3D
 	xom.setVisibilityDependency(at_3D, at_Uz_flag)
 	xom.setVisibilityDependency(at_3D, at_Rx_flag)
 	xom.setVisibilityDependency(at_3D, at_Ry_flag)
@@ -490,6 +549,10 @@ def makeXObjectMetaData():
 	xom.setVisibilityDependency(at_3D, at_Uz_fun)
 	xom.setVisibilityDependency(at_3D, at_Rx_fun)
 	xom.setVisibilityDependency(at_3D, at_Ry_fun)
+	xom.setVisibilityDependency(at_3D, at_Ry_fun)
+	xom.setVisibilityDependency(at_3D, at_Temperature_flag)
+	xom.setVisibilityDependency(at_3D, at_Temperature_val)
+	xom.setVisibilityDependency(at_3D, at_Temperature_fun)
 	
 	# input type
 	xom.setVisibilityDependency(at_Constant, at_Ux_val)
@@ -499,6 +562,7 @@ def makeXObjectMetaData():
 	xom.setVisibilityDependency(at_Constant, at_Ry_val)
 	xom.setVisibilityDependency(at_Constant, at_Rz_val)
 	xom.setVisibilityDependency(at_Constant,  at_P_val)
+	xom.setVisibilityDependency(at_Constant,  at_Temperature_val)
 	xom.setVisibilityDependency(at_Function, at_Ux_fun)
 	xom.setVisibilityDependency(at_Function, at_Uy_fun)
 	xom.setVisibilityDependency(at_Function, at_Uz_fun)
@@ -506,6 +570,7 @@ def makeXObjectMetaData():
 	xom.setVisibilityDependency(at_Function, at_Ry_fun)
 	xom.setVisibilityDependency(at_Function, at_Rz_fun)
 	xom.setVisibilityDependency(at_Function,  at_P_fun)
+	xom.setVisibilityDependency(at_Function,  at_Temperature_fun)
 	
 	# flag to value
 	xom.setVisibilityDependency(at_Ux_flag, at_Ux_val)
@@ -522,6 +587,8 @@ def makeXObjectMetaData():
 	xom.setVisibilityDependency(at_Rz_flag, at_Rz_fun)
 	xom.setVisibilityDependency(at_P_flag, at_P_val)
 	xom.setVisibilityDependency(at_P_flag, at_P_fun)
+	xom.setVisibilityDependency(at_Temperature_flag, at_Temperature_val)
+	xom.setVisibilityDependency(at_Temperature_flag, at_Temperature_fun)
 	
 	# auto-exclusive dependencies
 	
@@ -533,6 +600,7 @@ def makeXObjectMetaData():
 	xom.setBooleanAutoExclusiveDependency(at_ModelType, at_U)
 	xom.setBooleanAutoExclusiveDependency(at_ModelType, at_UP)
 	xom.setBooleanAutoExclusiveDependency(at_ModelType, at_UR)
+	xom.setBooleanAutoExclusiveDependency(at_ModelType, at_Temperature)
 	
 	# constant or function
 	xom.setBooleanAutoExclusiveDependency(at_InputType, at_Constant)
@@ -567,6 +635,8 @@ def controlInternal(pinfo, xobj, node):
 	is_relative = get_xobj_attribute('Relative').boolean
 	UR = get_xobj_attribute('U-R (Displacement+Rotation)').boolean
 	UP = get_xobj_attribute('U-P (Displacement+Pressure)').boolean
+
+	Temperature = get_xobj_attribute('T (Temperature)').boolean
 	
 	# flags
 	Ux = get_xobj_attribute('Ux').boolean
