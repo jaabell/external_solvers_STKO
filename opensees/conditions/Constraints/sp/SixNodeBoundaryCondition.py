@@ -39,7 +39,8 @@ def makeXObjectMetaData():
 
 def makeConditionRepresentationData(xobj):
 	d = MpcConditionRepresentationData()
-	d.type = MpcConditionVRepType.ConstraintGlyph
+	# d.type = MpcConditionVRepType.ConstraintGlyph
+	d.type = MpcConditionVRepType.Arrows
 	d.orientation = MpcConditionVRepOrientation.Global
 	d.data = Math.double_array([0.0, 0.0, 0.0])
 	d.on_vertices = False
@@ -48,6 +49,43 @@ def makeConditionRepresentationData(xobj):
 	d.on_solids = False
 	d.on_interactions = False
 	return d
+
+def fillConditionRepresentationData(xobj, pos, data):
+	'''
+	Fills the 3D vector data.
+	
+	Set the pressure value
+	at the z component, since the orientation is set to local
+	'''
+	#	F = xobj.getAttribute('F').quantityVector3.value
+	#	Mode = xobj.getAttribute('Mode').string
+	
+	#	sfx = Fx_at = xobj.getAttribute('Fx').string
+	#	sfy = Fy_at = xobj.getAttribute('Fy').string
+	#	sfz = Fz_at = xobj.getAttribute('Fz').string
+	
+	#	if (Mode == 'function'):
+		
+	#		seval = SpatialFunctionEval(pos)
+		
+	#		dx = seval.make(sfx)		#spatial function x
+	#		dy = seval.make(sfy)		#spatial function y
+	#		dz = seval.make(sfz)		#spatial function z
+		
+	#		data[0] = dx
+	#		data[1] = dy
+	#		data[2] = dz
+	
+	#	else:
+	#		data[0] = F.x
+	#		data[1] = F.y
+	#		data[2] = F.z
+
+	# Todo: replace here with the normal vector of the parent surface
+	data[0] = 1.
+	data[1] = 0.
+	data[2] = 0.
+
 
 def getRequestedNodalSpatialDim(xobj):
 	def _get_nodes(condition):
