@@ -1,0 +1,95 @@
+{
+    "HL": {
+        "tensor": {
+            "TensorLinearHardeningFunction": {
+                "parameters": {
+                    "TensorLinearHardeningParameter": 0
+                }
+            },
+            "ArmstrongFrederickHardeningFunction": {
+                "parameters": {
+                    "AF_ha": 0,
+                    "AF_cr": 0
+                }
+            },
+            "NullHardeningTensorFunction": {
+                "parameters" : {}
+            }
+        },
+        "scalar": {
+            "ScalarLinearHardeningFunction": {
+                "parameters": {
+                    "ScalarLinearHardeningParameter": 0
+                }
+            },
+            "NullHardeningScalarFunction": {
+                "parameters" : {}
+            }
+        }
+    },
+    "EL": {
+        "LinearIsotropic3D": {
+            "parameters": {
+                "YoungsModulus": 0,
+                "PoissonsRatio": 0
+            },
+            "variables": {}
+        },
+        "DuncanChang": {
+            "parameters": {
+                "ReferenceYoungsModulus": 0,
+                "PoissonsRatio": 0,
+                "ReferencePressure": 0,
+                "DuncanChang_MaxSigma3": 0,
+                "DuncanChang_n": 0
+            },
+            "variables": {}
+        }
+    },
+    "YF": {
+        "VonMises": {
+            "parameters": {},
+            "variables": {
+                "BackStress": "tensor",
+                "VonMisesRadius": "scalar"
+            }
+        },
+        "DruckerPrager": {
+            "parameters": {},
+            "variables": {
+                "BackStress": "tensor",
+                "VonMisesRadius": "scalar"
+            }
+        },
+        "MohrCoulomb": {
+            "parameters": {
+                "MC_c": 0,
+                "MC_phi": 0
+            },
+            "variables": {}
+        }
+    },
+    "PF": {
+        "VonMises": {
+            "parameters": {},
+            "variables": {
+                "BackStress": "tensor"
+            }
+        },
+        "DruckerPrager": {
+            "parameters": {},
+            "variables": {
+                "BackStress": "tensor",
+                "VonMisesRadius": "scalar"
+            }
+        },
+        "ConstantDilatancy": {
+            "parameters": {
+                "Dilatancy": 0
+            },
+            "variables": {
+                "BackStress": "tensor"
+            }
+        }
+    }
+}
