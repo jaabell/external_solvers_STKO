@@ -40,8 +40,8 @@
                 "ReferenceYoungsModulus": 0,
                 "PoissonsRatio": 0,
                 "ReferencePressure": 0,
-                "DuncanChang_MaxSigma3": 0,
-                "DuncanChang_n": 0
+                "DuncanChang_MaxSigma3": -0.01,
+                "DuncanChang_n": 0.5
             },
             "variables": {}
         }
@@ -64,7 +64,15 @@
         "MohrCoulomb": {
             "parameters": {
                 "MC_c": 0,
-                "MC_phi": 0
+                "MC_phi": 30.0,
+                "MC_ds": 0.001
+            },
+            "variables": {}
+        },
+        "TensionCutoff": {
+            "parameters": {
+                "MC_ds": 0.001,
+                "TC_min_stress": -0.1
             },
             "variables": {}
         }
@@ -89,6 +97,17 @@
             },
             "variables": {
                 "BackStress": "tensor"
+            }
+        },
+        "MohrCoulomb": {
+            "parameters": {
+                "MC_c": 0,
+                "MC_phi": 30.0,
+                "MC_ds": 0.001,
+                "Dilatancy": 0
+            },
+            "variables": {
+            	"BackStress": "tensor"
             }
         }
     }

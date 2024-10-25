@@ -54,7 +54,7 @@ def _check(xobj):
 			item.visible = False
 	# selectively show necessary ones
 	el = xobj.getAttribute('Elasticity').string
-	yf = xobj.getAttribute('Yeld Function').string
+	yf = xobj.getAttribute('Yield Function').string
 	pf = xobj.getAttribute('Plastic Flow').string
 	# elasticity
 	for item in EL[el].get('parameters', {}):
@@ -133,7 +133,7 @@ def makeXObjectMetaData():
 	# YF
 	YF = js['YF']
 	YF_values = list(YF.keys())
-	yf = mka('Yeld Function', 'Template', 'The Yield Function Type', MpcAttributeType.String, dval = YF_values[0])
+	yf = mka('Yield Function', 'Template', 'The Yield Function Type', MpcAttributeType.String, dval = YF_values[0])
 	yf.sourceType = MpcAttributeSourceType.List
 	yf.setSourceList(YF_values)
 	
@@ -193,19 +193,21 @@ def makeXObjectMetaData():
 
 	
 	# integration options
-	f_tol = mka('f_relative_tol', 'Integration Options', 'Yield function relative tolerance', MpcAttributeType.Real, dval=1.0e-6)
-	s_tol = mka('stress_relative_tol', 'Integration Options', 'Stress relative tolerance', MpcAttributeType.Real, dval=1.0e-6)
-	niter = mka('n_max_iterations', 'Integration Options', 'Maximum number of iteration for return mapping', MpcAttributeType.Integer, dval=100)
+	f_tol = mka('f_absolute_tol', 'Integration Options', 'Yield function absolute tolerance', MpcAttributeType.Real, dval=1.0e-6)
+	s_tol = mka('stress_absolute_tol', 'Integration Options', 'Stress absolute tolerance', MpcAttributeType.Real, dval=1.0e-6)
+	niter = mka('n_max_iterations', 'Integration Options', 'Maximum number of iterations YS intersection finding', MpcAttributeType.Integer, dval=100)
+	rk45_dT_min = mka('rk45_dT_min', 'Integration Options', 'Minimum internal time-step for RK45', MpcAttributeType.Real, dval=1e-2)
+	rk45_niter_max = mka('rk45_niter_max', 'Integration Options', 'Maximum number of iterations for RK45 algo', MpcAttributeType.Integer, dval=100)
 	#yretu = mka('return_to_yield_surface', 'Integration Options', 'return_to_yield_surface', MpcAttributeType.Integer, dval=1)
 	yretu = mka('return_to_yield_surface', 'Integration Options', 'Return to YS algorithm', MpcAttributeType.String, dval='One_Step_Return')
 	yretu.sourceType = MpcAttributeSourceType.List
 	yretu.setSourceList(['Disabled', 'One_Step_Return', 'Iterative_Return'])
-	metho = mka('method', 'Integration Options', 'Integration method', MpcAttributeType.String, dval='Runge_Kutta_45_Error_Control')
-	metho.sourceType = MpcAttributeSourceType.List
-	metho.setSourceList(['Forward_Euler', 'Runge_Kutta_45_Error_Control'])
+	integration_method = mka('integration_method', 'Integration Options', 'Integration method', MpcAttributeType.String, dval='Runge_Kutta_45_Error_Control')
+	integration_method.sourceType = MpcAttributeSourceType.List
+	integration_method.setSourceList(['Forward_Euler', 'Forward_Euler_Subincrement', 'Runge_Kutta_45_Error_Control'])
 	tangent_type = mka('tangent_type', 'Integration Options', 'Tangent type', MpcAttributeType.String, dval='Elastic')
 	tangent_type.sourceType = MpcAttributeSourceType.List
-	tangent_type.setSourceList(['Elastic', 'Numerical_Algorithmic'])
+	tangent_type.setSourceList(['Elastic', 'Continuum', 'Secant', 'Numerical_Algorithmic_FirstOrder','Numerical_Algorithmic_SecondOrder'])
 	
 	# xom
 	xom = MpcXObjectMetaData()
@@ -232,8 +234,10 @@ def makeXObjectMetaData():
 	xom.addAttribute(f_tol)
 	xom.addAttribute(s_tol)
 	xom.addAttribute(niter)
+	xom.addAttribute(rk45_dT_min)
+	xom.addAttribute(rk45_niter_max)
 	xom.addAttribute(yretu)
-	xom.addAttribute(metho)
+	xom.addAttribute(integration_method)
 	xom.addAttribute(tangent_type)
 	
 	# done
@@ -253,7 +257,7 @@ def writeTcl(pinfo):
 	
 	# get basic parameters
 	el = _geta(xobj, 'Elasticity').string
-	yf = _geta(xobj, 'Yeld Function').string
+	yf = _geta(xobj, 'Yield Function').string
 	pf = _geta(xobj, 'Plastic Flow').string
 	ss.write('{0}nDMaterial ASDPlasticMaterial {1} \\\n{0}{5}{2}_YF \\\n{0}{5}{3}_PF \\\n{0}{5}{4}_EL \\\n'.format(pinfo.indent, tag, yf, pf, el, pinfo.tabIndent))
 	
@@ -301,20 +305,24 @@ def writeTcl(pinfo):
 
 
 	# integration options
-	f_tol = _geta(xobj, 'f_relative_tol').real
-	s_tol = _geta(xobj, 'stress_relative_tol').real
+	f_tol = _geta(xobj, 'f_absolute_tol').real
+	s_tol = _geta(xobj, 'stress_absolute_tol').real
 	niter = _geta(xobj, 'n_max_iterations').integer
+	rk45_dT_min = _geta(xobj, 'rk45_dT_min').real
+	rk45_niter_max = _geta(xobj, 'rk45_niter_max').integer
 	yretu = _geta(xobj, 'return_to_yield_surface').string
-	metho = _geta(xobj, 'method').string
+	integration_method = _geta(xobj, 'integration_method').string
 	tangent_type = _geta(xobj, 'tangent_type').string
 	ss.write('{0}{1}Begin_Integration_Options \\\n'.format(pinfo.indent, pinfo.tabIndent))
-	ss.write('{0}{1}{1}f_relative_tol {2:.6e} \\\n'.format(pinfo.indent, pinfo.tabIndent, f_tol))
-	ss.write('{0}{1}{1}stress_relative_tol {2:.6e} \\\n'.format(pinfo.indent, pinfo.tabIndent, s_tol))
+	ss.write('{0}{1}{1}f_absolute_tol {2:.6e} \\\n'.format(pinfo.indent, pinfo.tabIndent, f_tol))
+	ss.write('{0}{1}{1}stress_absolute_tol {2:.6e} \\\n'.format(pinfo.indent, pinfo.tabIndent, s_tol))
 	ss.write('{0}{1}{1}n_max_iterations {2} \\\n'.format(pinfo.indent, pinfo.tabIndent, niter))
+	ss.write('{0}{1}{1}rk45_dT_min {2} \\\n'.format(pinfo.indent, pinfo.tabIndent, rk45_dT_min))
+	ss.write('{0}{1}{1}rk45_niter_max {2} \\\n'.format(pinfo.indent, pinfo.tabIndent, rk45_niter_max))
 	ss.write('{0}{1}{1}return_to_yield_surface {2} \\\n'.format(pinfo.indent, pinfo.tabIndent, yretu))
-	ss.write('{0}{1}{1}method {2} \\\n'.format(pinfo.indent, pinfo.tabIndent, metho))
+	ss.write('{0}{1}{1}integration_method {2} \\\n'.format(pinfo.indent, pinfo.tabIndent, integration_method))
 	ss.write('{0}{1}{1}tangent_type {2} \\\n'.format(pinfo.indent, pinfo.tabIndent, tangent_type))
-	ss.write('{0}{1}End_Integration_Options \\\n'.format(pinfo.indent, pinfo.tabIndent))
+	ss.write('{0}{1}End_Integration_Options \n'.format(pinfo.indent, pinfo.tabIndent))
 	print(ss.getvalue())
 	# now write the string into the file
 	pinfo.out_file.write(ss.getvalue())
