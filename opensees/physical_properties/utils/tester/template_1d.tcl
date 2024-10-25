@@ -8,14 +8,15 @@ timeSeries Path 1 -time $time_list -values $strain_list
 
 __materials__
 
+set L __lch__
 node 1 0
-node 2 1
+node 2 $L
 element truss 1 1 2 1.0 __tag__
 
 fix 1 1
 
 pattern Plain 1 1 {
-	sp 2 1 1.0
+	sp 2 1 $L
 }
 
 set outFile [open "__out__" w+]
@@ -56,7 +57,7 @@ for {set i 0} {$i < $num_step} {incr i} {
 	puts "__R__$perc $strain $stress"
 }
 
-
+close $outFile
 
 
 

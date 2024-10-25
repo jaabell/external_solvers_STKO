@@ -1,6 +1,6 @@
-## @package Tester1D
-# The Tester1D packages contains the tester and widget classes that are used
-# to run a test of a uniaxial material
+## @package TesterTIM6D
+# The TesterTIM6D packages contains the tester and widget classes that are used
+# to run a test of a TIM material
 
 import subprocess
 import os
@@ -47,6 +47,8 @@ from PySide2.QtWidgets import (
 	QSpinBox,
 	QDoubleSpinBox,
 	QLineEdit,
+	QRadioButton,
+	QTabWidget,
 	QToolBar,
 	QDialog,
 	QFileDialog,
@@ -57,26 +59,39 @@ from PySide2.QtWidgets import (
 	)
 import shiboken2
 
-## The Tester1D class class perform an async call to a new process
+
+class TIMTraits:
+	# types
+	D3 = 0
+	D5 = 1
+	D6 = 2
+	# attributes
+	FREEDOFS = ["0 0 0 1 1 1", "0 0 0 0 0 1", "0 0 0 0 0 0"]
+	STRAIN_SIZE = 6
+	STRESS_COMPONENTS = ['Q\u2081', 'Q\u2082', 'Q\u2083', 'QR\u2081', 'QR\u2082', 'QR\u2083']
+	STRAIN_COMPONENTS = ['q\u2081', 'q\u2082', 'q\u2083', 'qr\u2081', 'qr\u2082', 'qr\u2083']
+
+## The TesterTIM6D class class perform an async call to a new process
 # that runs opensees and communicate with it in real time. we don't want the gui to freeze,
 # so we do this operation in a worker thread
-class Tester1D(QObject):
+class TesterTIM6D(QObject):
 	
 	# a signal to notify that we have
 	# the new components of strain and stress
-	testProcessUpdated = Signal(float, float, float)
+	testProcessUpdated = Signal(float, object, object)
 	
-	# create a new Tester1D passing as arguments 
+	# create a new TesterTIM6D passing as arguments 
 	# a map (MpcPropertyCollection) of physical properties
-	# (or just one if the material does not depend on other materials)
+	# (or just one if the material does not depend on other materials), the component data,
 	# and a list of strains.
 	# in case of multiple materials the last one will be tested.
-	def __init__(self, materials, lch, time_history, strain_history, parent = None):
+	def __init__(self, type, materials, cdata, time_history, strain_history, parent = None):
 		# base class initialization
-		super(Tester1D, self).__init__(parent)
+		super(TesterTIM6D, self).__init__(parent)
 		# self initialization
+		self.type = type # TIMTraits types (0, 1, 3)
 		self.materials = materials
-		self.lch = lch
+		self.cdata = cdata
 		# copy the input strain vector in a private member. why? if the analysis does not finsh
 		# correctly, the stress will have less entries than the strain
 		self.__timeHistoryInput = time_history
@@ -100,7 +115,7 @@ class Tester1D(QObject):
 			raise Exception("No external solver kit provided")
 		
 		# temporary directory
-		temp_dir = '{}{}Tester1D'.format(MpcStandardPaths.getStandardPathDataLocation(), os.sep)
+		temp_dir = '{}{}TesterTIM6D'.format(MpcStandardPaths.getStandardPathDataLocation(), os.sep)
 		temp_dir = temp_dir.replace('\\','/')
 		if not os.path.exists(temp_dir):
 			os.makedirs(temp_dir)
@@ -124,7 +139,7 @@ class Tester1D(QObject):
 		pinfo.next_physicalProperties_id = App.caeDocument().physicalProperties.getlastkey(0)+1
 		
 		# get template
-		template_filename = '{}/template_1d.tcl'.format(os.path.dirname(__file__))
+		template_filename = '{}/{}'.format(os.path.dirname(__file__), 'template_TIM6D.tcl')
 		template_file = open(template_filename, 'r')
 		template = template_file.read()
 		template_file.close()
@@ -144,6 +159,16 @@ class Tester1D(QObject):
 		buffer_strain = tu.listToStringBuffer(self.__strainHistoryInput)
 		buffer_time = tu.listToStringBuffer(self.__timeHistoryInput)
 		
+		# build flags for tensor component controls
+		buffer_flags1 = StringIO()
+		buffer_flags2 = StringIO()
+		buffer_imps = StringIO()
+		for i in range(TIMTraits.STRAIN_SIZE):
+			ic = self.cdata[i]
+			buffer_flags1.write('{} '.format(ic.control))
+			buffer_flags2.write('{} '.format(ic.type))
+			buffer_imps.write('{} '.format(ic.value))
+		
 		# open the tcl script file
 		fo = open(temp_script_file, 'w')
 		
@@ -151,154 +176,22 @@ class Tester1D(QObject):
 		# and write to file
 		fo.write(template.replace(
 			'__materials__', buffer_materials.getvalue()).replace(
-			'__lch__', QLocale().toString(self.lch)).replace(
-			'__tag__', str(test_prop_id)).replace(
+			'__tag__', str(test_prop_id)).replace( 
 			'__time__', buffer_time.getvalue()).replace(
 			'__strain__', buffer_strain.getvalue()).replace(
-			'__out__', os.path.relpath(temp_output_file, temp_dir)))
+			'__flags1__', buffer_flags1.getvalue()).replace(
+			'__flags2__', buffer_flags2.getvalue()).replace(
+			'__imps__', buffer_imps.getvalue()).replace(
+			'__out__', temp_output_file).replace(
+			'__freedofs__', TIMTraits.FREEDOFS[self.type]))
 		
 		# relase temporary buffers
 		buffer_materials.close()
 		buffer_strain.close()
 		buffer_time.close()
-		
-		# close output file
-		fo.close()
-		
-		# return data
-		return (
-			opensees_cmd,
-			temp_dir,
-			temp_script_file,
-			temp_output_file
-			)
-	
-	# Runs the test filling the self.strain self.stress members.
-	def run(self):
-		
-		# prepare test
-		(opensees_cmd, temp_dir, temp_script_file, temp_output_file) = self.__prepare_test()
-		
-		# bugfix 01/2024
-		# since the working dir may contain unicode characters that won't work fine in tcl
-		# we pass the relative path, since the process will run anyway in the working dir
-		temp_script_file_rel = os.path.relpath(temp_script_file, temp_dir)
-		
-		print('Running OpenSEES')
-		print('command: {}'.format(opensees_cmd))
-		print('args: {}'.format(temp_script_file_rel))
-		
-		# launch opensees and communicate
-		for item in tu.executeAsync([opensees_cmd, temp_script_file_rel], temp_dir):
-			if item.startswith('__R__'):
-				# this line contains precentage and strain/stress data
-				tokens = item[5:].split()
-				ipercen = float(tokens[0])
-				istrain = float(tokens[1])
-				istress = float(tokens[2])
-				self.strain.append(istrain)
-				self.stress.append(istress)
-				# notify that tester data has been updated: emit signal
-				self.testProcessUpdated.emit(ipercen, istrain, istress)
-			else:
-				print(item)
-		
-		# remove temporary files
-		os.remove(temp_script_file)
-		os.remove(temp_output_file)
-		
-## The Tester1D class class perform an async call to a new process
-# that runs opensees and communicate with it in real time. we don't want the gui to freeze,
-# so we do this operation in a worker thread
-class Tester1DMaterialConfinedSection(QObject):
-	
-	# a signal to notify that we have
-	# the new components of strain and stress
-	testProcessUpdated = Signal(float, float, float)
-	
-	# create a new Tester1DMaterialConfinedSection passing as arguments 
-	# a map (MpcPropertyCollection) of physical properties
-	# (or just one if the material does not depend on other materials)
-	# and a list of strains.
-	# in case of multiple materials the last one will be tested.
-	def __init__(self, materialTclString, time_history, strain_history, parent = None):
-		# base class initialization
-		super(Tester1DMaterialConfinedSection, self).__init__(parent)
-		# self initialization
-		self.materialTclString = materialTclString
-		# copy the input strain vector in a private member. why? if the analysis does not finsh
-		# correctly, the stress will have less entries than the strain
-		self.__timeHistoryInput = time_history
-		self.__strainHistoryInput = strain_history
-		self.strain = []
-		self.stress = []
-	
-	# prepares data for testing and returns the command to run
-	# and the names of temporary files
-	def __prepare_test(self):
-		
-		# some initial checks
-		if self.materialTclString is None:
-			raise Exception("No material provided to the tester")
-		if len(self.__strainHistoryInput) == 0:
-			raise Exception("No strain history provided to the tester")
-		
-		# make sure we have at least one OpenSEES installed and set to the STKO kits!
-		opensees_cmd = PyMpc.App.currentSolverCommand()
-		if not opensees_cmd:
-			raise Exception("No external solver kit provided")
-		
-		# temporary directory
-		temp_dir = '{}{}Tester1D'.format(MpcStandardPaths.getStandardPathDataLocation(), os.sep)
-		temp_dir = temp_dir.replace('\\','/')
-		if not os.path.exists(temp_dir):
-			os.makedirs(temp_dir)
-		print('Working directory: "{}"'.format(temp_dir))
-		
-		# temporary tcl script file
-		temp_script = 'script.tcl'
-		temp_script_file = '{}{}{}'.format(temp_dir, os.sep, temp_script)
-		temp_script_file = temp_script_file.replace('\\','/')
-		print('Script file: "{}"'.format(temp_script_file))
-		
-		# temporary txt output file
-		temp_output = 'output.txt'
-		temp_output_file = '{}{}{}'.format(temp_dir, os.sep, temp_output)
-		temp_output_file = temp_output_file.replace('\\','/')
-		print('Output file: "{}"'.format(temp_output_file))
-		
-		# create process info
-		pinfo = tclin.process_info()
-		pinfo.out_dir = temp_dir
-		pinfo.next_physicalProperties_id = App.caeDocument().physicalProperties.getlastkey(0)+1
-		
-		# get template
-		template_filename = '{}/template_1d.tcl'.format(os.path.dirname(__file__))
-		template_file = open(template_filename, 'r')
-		template = template_file.read()
-		template_file.close()
-		
-		from io import StringIO
-		
-		# write the time and strain vectors
-		buffer_strain = tu.listToStringBuffer(self.__strainHistoryInput)
-		buffer_time = tu.listToStringBuffer(self.__timeHistoryInput)
-		
-		# open the tcl script file
-		fo = open(temp_script_file, 'w')
-		
-		# replace placeholders with actual data
-		# and write to file
-		fo.write(template.replace(
-			'__materials__', self.materialTclString).replace(
-			'__tag__', str(1)).replace(
-			'__time__', buffer_time.getvalue()).replace(
-			'__strain__', buffer_strain.getvalue()).replace(
-			'__out__', temp_output_file))
-		
-		# release temporary buffers
-		buffer_strain.close()
-		buffer_time.close()
+		buffer_flags1.close()
+		buffer_flags2.close()
+		buffer_imps.close()
 		
 		# close output file
 		fo.close()
@@ -320,25 +213,32 @@ class Tester1DMaterialConfinedSection(QObject):
 		print('command: {}'.format(opensees_cmd))
 		print('args: {}'.format(temp_script_file))
 		
+		# strain size
+		ssize = TIMTraits.STRAIN_SIZE
+		
 		# launch opensees and communicate
 		for item in tu.executeAsync([opensees_cmd, temp_script_file], temp_dir):
 			if item.startswith('__R__'):
-				# this linke contains precentage and strain/stress data
-				tokens = item[5:].split()
+				# this line contains precentage and strain/stress data
+				tokens = item[5:].split('|')
 				ipercen = float(tokens[0])
-				istrain = float(tokens[1])
-				istress = float(tokens[2])
+				# get tokens for strain and stress
+				tokens_strain = tokens[1].split()
+				tokens_stress = tokens[2].split()
+				istrain = [float(i) for i in tokens_strain]
+				istress = [float(i) for i in tokens_stress]
 				self.strain.append(istrain)
 				self.stress.append(istress)
 				# notify that tester data has been updated: emit signal
 				self.testProcessUpdated.emit(ipercen, istrain, istress)
+			else:
+				print(item)
 		
 		# remove temporary files
-		os.remove(temp_script_file)
-		os.remove(temp_output_file)
+		#os.remove(temp_script_file)
+		#os.remove(temp_output_file)
 
-
-## The Tester1DWidget class is a widget used to run material simulation for uniaxialMaterial models.
+## The TesterTIM6DWidget class is a widget used to run material simulation for uniaxialMaterial models.
 # 
 # This custom widget will be added in the right side of the STKO XObject Editor, next to the standard
 # XObject Attribute Tree Editor. It consists of:
@@ -352,19 +252,31 @@ class Tester1DMaterialConfinedSection(QObject):
 # @note Some widgets used here comes from STKO Python API, they are C++ classes exposed to Python via Boost.Python
 # while all other widgets are part of PySide2 and thus exposed via Shiboken2. Since they are incompatible, we use
 # the shiboken2.wrapInstance method on the raw C++ pointer.
-class Tester1DWidget(QWidget):
+class TesterTIM6DWidget(QWidget):
+	
+	## a custom radio button with an int data (0 to 5)
+	class IndexedRadioButton(QRadioButton):
+		def __init__(self, text, index, parent = None):
+			QRadioButton.__init__(self, text, parent)
+			self.index = index
 	
 	## constructor
-	def __init__(self, editor, xobj, parent = None):
+	def __init__(self, type, editor, xobj, parent = None):
 		# base class initialization
-		super(Tester1DWidget, self).__init__(parent)
+		super(TesterTIM6DWidget, self).__init__(parent)
 		
-		# the locale
-		locale = QLocale()
+		# nD type
+		self.type = type
+		ssize = TIMTraits.STRAIN_SIZE
+		STRAIN_COMPONENTS = TIMTraits.STRAIN_COMPONENTS
+		STRESS_COMPONENTS = TIMTraits.STRESS_COMPONENTS
 		
 		# layout
 		self.setLayout(QVBoxLayout())
 		self.layout().setContentsMargins(0,0,0,0)
+		
+		# locale
+		locale = QLocale()
 		
 		# description label
 		self.descr_label = gu.makeTesterLabel()
@@ -384,27 +296,22 @@ class Tester1DWidget(QWidget):
 		self.strain_hist_label_type = QLabel("Type")
 		self.strain_hist_label_num_cyc = QLabel("Cycles")
 		self.strain_hist_label_div = QLabel("Divisions")
-		self.strain_hist_label_target_strain = QLabel("Target strain")
+		self.strain_hist_label_target_strain = QLabel("Top disp. (global coord)")
+		self.strain_hist_label_component = QLabel("Tested component")
 		self.strain_hist_label_scale_positive = QLabel("Pos scale")
 		self.strain_hist_label_scale_negative = QLabel("Neg scale")
 		self.strain_hist_layout.addWidget(self.strain_hist_label_type, 0, 0, 1, 1)
 		self.strain_hist_layout.addWidget(self.strain_hist_label_num_cyc, 1, 0, 1, 1)
 		self.strain_hist_layout.addWidget(self.strain_hist_label_div, 2, 0, 1, 1)
 		self.strain_hist_layout.addWidget(self.strain_hist_label_target_strain, 3, 0, 1, 1)
-		self.strain_hist_layout.addWidget(self.strain_hist_label_scale_positive, 4, 0, 1, 1)
-		self.strain_hist_layout.addWidget(self.strain_hist_label_scale_negative, 5, 0, 1, 1)
+		self.strain_hist_layout.addWidget(self.strain_hist_label_component, 4, 0, 1, 1)
+		self.strain_hist_layout.addWidget(self.strain_hist_label_scale_positive, 5, 0, 1, 1)
+		self.strain_hist_layout.addWidget(self.strain_hist_label_scale_negative, 6, 0, 1, 1)
 		# strain history type combobox
 		self.strain_hist_cbox = QComboBox()
 		for strain_hist_name in StrainHistoryFactory.getTypes():
 			self.strain_hist_cbox.addItem(strain_hist_name)
 		self.strain_hist_layout.addWidget(self.strain_hist_cbox, 0, 1, 1, 1)
-		# and its editor button for custom histories
-		self.custom_hist_button = QPushButton()
-		self.custom_hist_button.setText("...")
-		self.custom_hist_button.setToolTip("Click to edit the custom strain history")
-		self.custom_hist_button.setMaximumWidth(24)
-		self.strain_hist_layout.addWidget(self.custom_hist_button, 0, 2, 1, 1) # todo put the CBox in a layout with no-margin and put this on the right
-		self.custom_hist_vector = MpcQuantityVector()
 		# strain history num_cyc spin box
 		self.strain_hist_num_cyc_spinbox = QSpinBox()
 		self.strain_hist_num_cyc_spinbox.setRange(1, 1000)
@@ -414,23 +321,28 @@ class Tester1DWidget(QWidget):
 		self.strain_hist_divisions_spinbox.setRange(1, 1000000)
 		self.strain_hist_layout.addWidget(self.strain_hist_divisions_spinbox, 2, 1, 1, 1)
 		# strain history max strain line edit
-		self.strain_hist_target_strain = QLineEdit(QLocale().toString(-0.003))
+		self.strain_hist_target_strain = QLineEdit(locale.toString(-0.003))
 		self.strain_hist_target_strain.setValidator(QDoubleValidator())
 		self.strain_hist_layout.addWidget(self.strain_hist_target_strain, 3, 1, 1, 1)
+		# strain history controlled component combobox
+		self.strain_hist_component_cbox = QComboBox()
+		for item in STRAIN_COMPONENTS:
+			self.strain_hist_component_cbox.addItem(item)
+		self.strain_hist_layout.addWidget(self.strain_hist_component_cbox, 4, 1, 1, 1)
 		# strain history positive scale double spin box
 		self.strain_hist_scale_positive_spinbox = QDoubleSpinBox()
 		self.strain_hist_scale_positive_spinbox.setRange(-1000, 1000)
 		self.strain_hist_scale_positive_spinbox.setDecimals(3)
 		self.strain_hist_scale_positive_spinbox.setStepType(QDoubleSpinBox.AdaptiveDecimalStepType)
-		self.strain_hist_layout.addWidget(self.strain_hist_scale_positive_spinbox, 4, 1, 1, 1)
+		self.strain_hist_layout.addWidget(self.strain_hist_scale_positive_spinbox, 5, 1, 1, 1)
 		# strain history positive scale double spin box
 		self.strain_hist_scale_negative_spinbox = QDoubleSpinBox()
 		self.strain_hist_scale_negative_spinbox.setRange(-1000, 1000)
 		self.strain_hist_scale_negative_spinbox.setDecimals(3)
 		self.strain_hist_scale_negative_spinbox.setStepType(QDoubleSpinBox.AdaptiveDecimalStepType)
-		self.strain_hist_layout.addWidget(self.strain_hist_scale_negative_spinbox, 5, 1, 1, 1)
+		self.strain_hist_layout.addWidget(self.strain_hist_scale_negative_spinbox, 6, 1, 1, 1)
 		# strain history chart data
-		self.strain_hist_chart_data = gu.makeChartData("Strain-Time Response", "Pseudo-Time", "Strain")
+		self.strain_hist_chart_data = gu.makeChartData("Deformation-Time Response", "Pseudo-Time", "Deformation")
 		# strain history chart item
 		self.strain_hist_chart_item = MpcChartDataGraphicItem(self.strain_hist_chart_data)
 		self.strain_hist_chart_item.color = MpcQColor(56,147,255, 255)
@@ -441,13 +353,7 @@ class Tester1DWidget(QWidget):
 		self.strain_hist_chart.addItem(self.strain_hist_chart_item)
 		# strain history chart frame
 		self.strain_hist_chart_frame = gu.makeChartFrame()
-		self.strain_hist_layout.addWidget(self.strain_hist_chart_frame, 0, 2, 5, 2)
-		# lch
-		self.lch_label = QLabel('Lch')
-		self.lch_value = QLineEdit(locale.toString(1.0))
-		self.lch_value.setValidator(QDoubleValidator())
-		self.strain_hist_layout.addWidget(self.lch_label, 5, 2, 1, 1)
-		self.strain_hist_layout.addWidget(self.lch_value, 5, 3, 1, 1)
+		self.strain_hist_layout.addWidget(self.strain_hist_chart_frame, 0, 2, 6, 2)
 		# strain history chart widget
 		self.strain_hist_mpc_chart_widget = MpcChartWidget()
 		self.strain_hist_mpc_chart_widget.chart = self.strain_hist_chart
@@ -466,42 +372,86 @@ class Tester1DWidget(QWidget):
 		self.separator_2 = gu.makeHSeparator()
 		self.layout().addWidget(self.separator_2)
 		
-		# Test toolbar
-		self.toolbar = QToolBar()
-		self.toolbar.addAction("Load",self.loadReferenceData)
-		self.toolbar.addAction("Unload",self.unloadReferenceData)
-		self.toolbar.addAction("Genetic", self.geneticCalibrationPressed)
-		self.layout().addWidget(self.toolbar)
-		# stress-strain chart data
-		self.chart_data = gu.makeChartData("Stress-Strain Response", "Strain", "Stress")
-		self.chart_reference_data = gu.makeChartData("Reference Curve", "Strain", "Stress", 2)
-		# stress-strain chart item
-		self.chart_item = MpcChartDataGraphicItem(self.chart_data)
-		self.chart_item.color = MpcQColor(56,147,255, 255)
-		self.chart_item.thickness = 1.5
-		self.chart_item.penStyle = MpcQPenStyle.SolidLine
-		# stress-strain reference chart item
-		self.chart_reference_item = MpcChartDataGraphicItem(self.chart_reference_data)
-		self.chart_reference_item.color = MpcQColor(190,190,255, 255)
-		self.chart_reference_item.thickness = 1.5
-		self.chart_reference_item.penStyle = MpcQPenStyle.SolidLine
-		# reference stress and strain vectors
-		self.reference_strain = MpcQuantityVector()
-		self.reference_stress = MpcQuantityVector()
+		# add controls for other components
+		self.components_container = QWidget()
+		self.components_layout = QGridLayout()
+		self.components_container.setLayout(self.components_layout)
+		self.components_layout.setContentsMargins(0,0,0,0)
+		self.components_descr_1 = QLabel("Type")
+		self.components_descr_2 = QLabel("Reference value")
+		self.components_layout.addWidget(self.components_descr_1, 0, 0, 1, 1)
+		self.components_layout.addWidget(self.components_descr_2, 1, 0, 1, 1)
+		self.components_strain = []
+		self.components_stress = []
+		self.components_groups = []
+		self.components_values = []
+		self.components_test = []
+		for i in range(ssize):
+			ice = TesterTIM6DWidget.IndexedRadioButton(STRAIN_COMPONENTS[i], i)
+			ics = TesterTIM6DWidget.IndexedRadioButton(STRESS_COMPONENTS[i], i)
+			ics.setChecked(True)
+			icv = QLineEdit()
+			icv.setValidator(QDoubleValidator())
+			icv.setText(locale.toString(0.0))
+			icg = QWidget()
+			icg.setLayout(QVBoxLayout())
+			icg.layout().setContentsMargins(0,0,0,0)
+			icg.layout().addWidget(ice)
+			icg.layout().addWidget(ics)
+			ict = QLabel("(Tested)")
+			self.components_strain.append(ice)
+			self.components_stress.append(ics)
+			self.components_groups.append(icg)
+			self.components_values.append(icv)
+			self.components_test.append(ict)
+			self.components_layout.addWidget(icg, 0, i+1, 1, 1)
+			self.components_layout.addWidget(icv, 1, i+1, 1, 1)
+			self.components_layout.addWidget(ict, 2, i+1, 1, 1)
+		self.layout().addWidget(self.components_container)
 		
-		# stress-strain chart
-		self.chart = MpcChart(1)
-		self.chart.addItem(self.chart_item)
-		self.chart.addItem(self.chart_reference_item)
-		# stress-strain frame
-		self.chart_frame = gu.makeChartFrame()
-		self.layout().addWidget(self.chart_frame)
-		# stress-strain chart widget
-		self.mpc_chart_widget = MpcChartWidget()
-		self.mpc_chart_widget.chart = self.chart
-		self.mpc_chart_widget.removeLegend()
-		self.chart_widget = shiboken2.wrapInstance(self.mpc_chart_widget.getPtr(), QWidget)
-		self.chart_frame.layout().addWidget(self.chart_widget)
+		# separator
+		self.separator_3 = gu.makeHSeparator()
+		self.layout().addWidget(self.separator_3)
+		
+		# stress-strain chart data (1 for each component)
+		self.chart_tab_widget = QTabWidget()
+		self.layout().addWidget(self.chart_tab_widget)
+		self.chart_data = []
+		self.chart_item = []
+		self.chart = []
+		self.chart_frame = []
+		self.mpc_chart_widget = []
+		self.chart_widget = []
+		for i in range(ssize):
+			# labels
+			c_strain = STRAIN_COMPONENTS[i]
+			c_stress = STRESS_COMPONENTS[i]
+			# chart data
+			chart_data = gu.makeChartData("{}-{} Response".format(c_strain, c_stress), '{} (Local deformation)'.format(c_strain), '{} (Local force)'.format(c_stress))
+			self.chart_data.append(chart_data)
+			# stress-strain chart item
+			chart_item = MpcChartDataGraphicItem(chart_data)
+			chart_item.color = MpcQColor(56,147,255, 255)
+			chart_item.thickness = 1.5
+			chart_item.penStyle = MpcQPenStyle.SolidLine
+			self.chart_item.append(self.chart_item)
+			# stress-strain chart
+			chart = MpcChart(1)
+			chart.addItem(chart_item)
+			self.chart.append(chart)
+			# stress-strain frame
+			chart_frame = gu.makeChartFrame()
+			self.chart_frame.append(chart_frame)
+			# stress-strain chart widget
+			mpc_chart_widget = MpcChartWidget()
+			mpc_chart_widget.chart = chart
+			mpc_chart_widget.removeLegend()
+			self.mpc_chart_widget.append(mpc_chart_widget)
+			chart_widget = shiboken2.wrapInstance(mpc_chart_widget.getPtr(), QWidget)
+			self.chart_widget.append(chart_widget)
+			chart_frame.layout().addWidget(chart_widget)
+			# add tab
+			self.chart_tab_widget.addTab(chart_frame, "{}-{}".format(c_strain, c_stress))
 		
 		# Run session
 		# run container
@@ -537,6 +487,9 @@ class Tester1DWidget(QWidget):
 		# this function will also set members for strain history
 		self.onStrainHistoryTypeChanged()
 		
+		# same for onComponentsUpdated
+		self.onComponentsUpdated()
+		
 		# the tester is none here
 		self.tester = None
 		
@@ -552,23 +505,7 @@ class Tester1DWidget(QWidget):
 		ds = a.string
 		try:
 			jds = json.loads(ds)
-			jds = jds['Tester1D']
-			# Load data if present
-			reference_strain = jds.get('reference_strain',[])
-			reference_strain_vec = PyMpc.Math.vec(len(reference_strain))
-			for i in range(len(reference_strain)):
-				reference_strain_vec[i] = reference_strain[i]
-			self.reference_strain.referenceValue = reference_strain_vec
-			
-			reference_stress = jds.get('reference_stress',[])
-			reference_stress_vec = PyMpc.Math.vec(len(reference_stress))
-			for i in range(len(reference_stress)):
-				reference_stress_vec[i] = reference_stress[i]
-			self.reference_stress.referenceValue = reference_stress_vec
-			
-			# update the chart if data is loaded
-			self.updateReferenceCurve()
-			
+			jds = jds['TesterTIM6D']
 			class_name = jds['name']
 			self.strain_hist_cbox.setCurrentText(class_name)
 			# call this to set up default values (no connections here)
@@ -577,24 +514,26 @@ class Tester1DWidget(QWidget):
 			self.strain_hist_num_cyc_spinbox.setValue(num_cycles)
 			num_divisions = jds.get('num_div',self.strain_hist_divisions_spinbox.value())
 			self.strain_hist_divisions_spinbox.setValue(num_divisions)
+			target_strain = jds.get('target_strain', QLocale().toDouble(self.strain_hist_target_strain.text())[0])
+			self.strain_hist_target_strain.setText(QLocale().toString(target_strain))
+			tested_comp = jds.get('tested_comp', 0) 
+			self.strain_hist_component_cbox.setCurrentIndex(tested_comp)
 			scale_pos = jds.get('scale_positive',self.strain_hist_scale_positive_spinbox.value())
 			self.strain_hist_scale_positive_spinbox.setValue(scale_pos)
 			scale_neg = jds.get('scale_negative',self.strain_hist_scale_negative_spinbox.value())
 			self.strain_hist_scale_negative_spinbox.setValue(scale_neg)
-			
-			target_strain = jds.get('target_strain', QLocale().toDouble(self.strain_hist_target_strain.text())[0])
-			self.strain_hist_target_strain.setText(QLocale().toString(target_strain))
-			
-			custom_vector = jds.get('custom_vector',[])
-			custom_vector_vec = PyMpc.Math.vec(len(custom_vector))
-			for i in range(len(custom_vector)):
-				custom_vector_vec[i] = custom_vector[i]
-			self.custom_hist_vector.referenceValue = custom_vector_vec
-			
+			ctypes = jds.get('components_types',None)
+			if ctypes:
+				for i, istrain, istress in zip(ctypes, self.components_strain, self.components_stress):
+					istrain.setChecked(i)
+					istress.setChecked(not i)
+			cvalues = jds.get('components_values',None)
+			if cvalues:
+				for i, ivalue in zip(cvalues, self.components_values):
+					ivalue.setText(locale.toString(i))
 			# call this to set up strain history with restored values (no connections here)
 			self.onStrainHistoryParamChanged()
-			# lch
-			self.lch_value.setText(locale.toString(jds.get('lch', 1.0)))
+			self.onComponentsUpdated()
 		except:
 			# if impossible to load, load default values
 			pass
@@ -609,82 +548,11 @@ class Tester1DWidget(QWidget):
 		self.strain_hist_scale_negative_spinbox.valueChanged.connect(self.onStrainHistoryParamChanged)
 		self.run_button.clicked.connect(self.onTestClicked)
 		self.data_button.clicked.connect(self.onDataClicked)
-		self.custom_hist_button.clicked.connect(self.onCustomHistClicked)
-		
-	def updateReferenceCurve(self):
-		# Read the data and save the list
-		# Read data and fill the lists
-		eps = []
-		for i in range(len(self.reference_strain)):
-			eps.append(self.reference_strain.referenceValueAt(i))
-		sig = []
-		for i in range(len(self.reference_stress)):
-			sig.append(self.reference_stress.referenceValueAt(i))
-		# Save the chart data
-		self.chart_reference_data.y = PyMpc.Math.double_array(sig)
-		self.chart_reference_data.x = PyMpc.Math.double_array(eps)
-		# update chart
-		self.mpc_chart_widget.chart = self.chart
-		self.mpc_chart_widget.autoScale()
-		
-	def loadReferenceData(self):
-		try:
-			# choose file
-			# the active / last used directory is accessible with ???
-			dialog = QFileDialog(self)
-			dialog.setFileMode(QFileDialog.AnyFile)
-			dialog.setViewMode(QFileDialog.Detail)
-			if dialog.exec():
-				fileName = dialog.selectedFiles()
-				print(fileName)
-				# Load the data
-				try:
-					fileObj = open(fileName[0], 'r')
-				except (OSError, IOError):
-					PyMpc.IO.write_cerr('File "{}" not found \n'.format(fileName))
-				else:
-					# Read data and fill the lists
-					eps, sig = [], []
-					for line in fileObj:
-						values = [float(s) for s in line.split()]
-						eps.append(values[0])
-						sig.append(values[1])
-					fileObj.close()
-					# Save strain and stress in reference vectors for future access
-					ref_strain_vec = PyMpc.Math.vec(len(eps))
-					for i in range(len(eps)):
-						ref_strain_vec[i] = eps[i]
-					self.reference_strain.referenceValue = ref_strain_vec
-					ref_stress_vec = PyMpc.Math.vec(len(sig))
-					for i in range(len(eps)):
-						ref_stress_vec[i] = sig[i]
-					self.reference_stress.referenceValue = ref_stress_vec
-					
-					# update the chart
-					self.updateReferenceCurve()
-					
-		except:
-			exdata = traceback.format_exc().splitlines()
-			PyMpc.IO.write_cerr('Error:\n{}\n'.format('\n'.join(exdata)))
-		
-	def unloadReferenceData(self):
-		# Erase the vectors for reference strain and stress
-		self.reference_strain.resize(0)
-		self.reference_stress.resize(0)
-		# Erse the data
-		self.chart_reference_data.y = PyMpc.Math.double_array([])
-		self.chart_reference_data.x = PyMpc.Math.double_array([])
-		# update chart
-		self.mpc_chart_widget.chart = self.chart
-		self.mpc_chart_widget.autoScale()
-		
-	def geneticCalibrationPressed(self):
-		print('Pressed the button to automatically calibrate with genetic algorithm')
+		self.strain_hist_component_cbox.currentIndexChanged.connect(self.onComponentsUpdated)
 	
 	def onEditFinished(self):
 		#################################################### $JSON
 		# store initial values to datastore
-		locale = QLocale()
 		a = self.xobj.getAttribute(MpcXObjectMetaData.dataStoreAttributeName())
 		if a is None:
 			raise Exception("Cannot find dataStore Attribute")
@@ -694,36 +562,44 @@ class Tester1DWidget(QWidget):
 		except:
 			jds = {}
 		# Creation of dictionary with intial values to store
+		locale = QLocale()
 		class_name = self.strain_hist_cbox.currentText()
 		num_cycles = self.strain_hist_num_cyc_spinbox.value()
 		num_divisions = self.strain_hist_divisions_spinbox.value()
-		target_strain = QLocale().toDouble(self.strain_hist_target_strain.text())[0]
+		target_strain = locale.toDouble(self.strain_hist_target_strain.text())[0]
+		tested_comp = self.strain_hist_component_cbox.currentIndex()
 		scale_pos = self.strain_hist_scale_positive_spinbox.value()
 		scale_neg = self.strain_hist_scale_negative_spinbox.value()
-		custom_vector = []
-		for i in range(len(self.custom_hist_vector)):
-			custom_vector.append(self.custom_hist_vector.referenceValueAt(i))
-		reference_strain = []
-		for i in range(len(self.reference_strain)):
-			reference_strain.append(self.reference_strain.referenceValueAt(i))
-		reference_stress = []
-		for i in range(len(self.reference_stress)):
-			reference_stress.append(self.reference_stress.referenceValueAt(i))
-		lch = locale.toDouble(self.lch_value.text())[0]
-		jds['Tester1D'] = {
-			'name': class_name, 
-			'num_cycl': num_cycles, 
-			'num_div': num_divisions, 
-			'target_strain': target_strain, 
-			'scale_positive': scale_pos, 
-			'scale_negative': scale_neg, 
-			'custom_vector': custom_vector, 
-			'reference_strain': reference_strain, 
-			'reference_stress': reference_stress,
-			'lch': lch
+		ctypes = [ i.isChecked() for i in self.components_strain ]
+		cvalues = [ locale.toDouble(i.text())[0] for i in self.components_values ]
+		jds['TesterTIM6D'] = {
+			'name': class_name,
+			'num_cycl': num_cycles,
+			'num_div': num_divisions,
+			'target_strain': target_strain,
+			'tested_comp': tested_comp,
+			'scale_positive': scale_pos,
+			'scale_negative': scale_neg,
+			'components_types': ctypes,
+			'components_values': cvalues,
 			}
 		a.string = json.dumps(jds, indent=4)
 		#################################################### $JSON
+	
+	def onComponentsUpdated(self):
+		# the tested component id
+		tested_id = self.strain_hist_component_cbox.currentIndex()
+		# switch tested labels on/off
+		for i in range(TIMTraits.STRAIN_SIZE):
+			if i == tested_id:
+				self.components_test[i].setVisible(True)
+				self.components_groups[i].setEnabled(False)
+				self.components_values[i].setEnabled(False)
+				self.components_strain[i].setChecked(True)
+			else:
+				self.components_test[i].setVisible(False)
+				self.components_groups[i].setEnabled(True)
+				self.components_values[i].setEnabled(True)
 	
 	def onStrainHistoryTypeChanged(self):
 		# obtain self.strain_hist default self.strain_hist_params 
@@ -743,8 +619,6 @@ class Tester1DWidget(QWidget):
 		self.strain_hist_num_cyc_spinbox.setEnabled(self.strain_hist_params.num_cycles_editable)
 		self.strain_hist_scale_positive_spinbox.setValue(self.strain_hist_params.scale_pos)
 		self.strain_hist_scale_negative_spinbox.setValue(self.strain_hist_params.scale_neg)
-		# show/hide custom hist button
-		self.custom_hist_button.setVisible(class_name == "Custom")
 		# manually call the param changed slot
 		# to update the plot
 		self.onStrainHistoryParamChanged()
@@ -758,38 +632,6 @@ class Tester1DWidget(QWidget):
 		# get scale factors
 		self.strain_hist_params.scale_pos = self.strain_hist_scale_positive_spinbox.value()
 		self.strain_hist_params.scale_neg = self.strain_hist_scale_negative_spinbox.value()
-		# get the custom_vector
-		self.strain_hist_params.custom_history_vector = self.custom_hist_vector
-		if self.strain_hist_cbox.currentText() == "ReferenceCurveHistory":
-			# DIEGO: da spostare?
-			if len(self.reference_strain) == 0:
-				msg = QMessageBox()
-				msg.setIcon(QMessageBox.Warning)
-				msg.setText("Error reference strain history")
-				msg.setInformativeText("No reference stress-strain curve was provided")
-				msg.setWindowTitle("Reference strain history")
-				msg.setDetailedText("Please provide stress-strain curve or change strain history\nSetting default strain history")
-				msg.setStandardButtons(QMessageBox.Ok)
-				# retval = msg.exec_()
-				msg.exec_()
-				# PER MASSIMO: PER DIEGO
-				# L'eccezione meglio non lanciarla perche si trova in uno slot che viene chiamato
-				# nell'event loop della gui... in questi casi (errori dell'utente) meglio gestirli con messaggi di errore
-				# e fallback su valori di default.
-				# raise Exception("Please provide a reference curve or change strain history") 
-				if self.strain_hist_cbox.count() > 0:
-					print('Setting a default strain history')
-					# qui ci vuole un signal blocker, altrimenti cambiare il valore corrente della combobox
-					# lancia il segnale che richiama onStrainHistoryTypeChanged, che richiama questo metodo
-					# in un loop infinito fino ad andare in stack overflow
-					blocker = QSignalBlocker(self.strain_hist_cbox)
-					self.strain_hist_cbox.setCurrentText("CyclicAsymmetric") # qui ho cambiato in setCurrentText 
-					print('Setted Cyclic Asymmetric')
-					# Ora lo puoi chiamare tranquillamente. Crashava perche per sbaglio avevi scritto
-					# strain_hist_cbox.currentText("qualcosa") invece di strain_hist_cbox.setCurrentText("qualcosa")
-					# per cui lui non cambiava mai il testo corrente e tornava sempre in questo metodo nell'if alla rigas 599!!
-					self.onStrainHistoryTypeChanged() # Questo CRASHA - immagino vadano bloccate le call?
-			self.strain_hist_params.custom_history_vector = self.reference_strain
 		# update chart data
 		try:
 			self.strain_hist.build(self.strain_hist_params)
@@ -812,17 +654,15 @@ class Tester1DWidget(QWidget):
 		# set chart
 		self.strain_hist_mpc_chart_widget.chart = self.strain_hist_chart
 		self.strain_hist_mpc_chart_widget.autoScale()
-		
-	def onCustomHistClicked(self):
-		MpcEditQuantityVectorEditorDialog(self.custom_hist_vector, self.editor)
-		
-		self.onStrainHistoryParamChanged()
 	
 	@Slot(float, float, float)
 	def onTestProcessUpdated(self, iperc, istrain, istress):
+		# strain size
+		ssize = TIMTraits.STRAIN_SIZE
 		# update strain/stress data
-		self.chart_data.x.append(istrain)
-		self.chart_data.y.append(istress)
+		for i in range(ssize):
+			self.chart_data[i].x.append(istrain[i])
+			self.chart_data[i].y.append(istress[i])
 		# update gui:
 		# note: this is visual appealing and capture the user attention while
 		# a job is beeing done. howver it slows down the job execution, so
@@ -832,8 +672,9 @@ class Tester1DWidget(QWidget):
 		if self.delta_percentage > 0.0099 or iperc > 0.9999:
 			self.delta_percentage = 0.0
 			# update chart
-			self.mpc_chart_widget.chart = self.chart
-			self.mpc_chart_widget.autoScale()
+			for i in range(ssize):
+				self.mpc_chart_widget[i].chart = self.chart[i]
+				self.mpc_chart_widget[i].autoScale()
 			# update progress bar
 			self.run_progress_bar.setValue(int(round(iperc*100.0)))
 			# process all events to prevent gui from freezing
@@ -841,9 +682,13 @@ class Tester1DWidget(QWidget):
 	
 	def onTestClicked(self):
 		
+		# strain size
+		ssize = TIMTraits.STRAIN_SIZE
+		
 		# reset chart data
-		self.chart_data.x = PyMpc.Math.double_array()
-		self.chart_data.y = PyMpc.Math.double_array()
+		for i in range(ssize):
+			self.chart_data[i].x = PyMpc.Math.double_array()
+			self.chart_data[i].y = PyMpc.Math.double_array()
 		
 		# reset percentage data
 		self.old_percentage = 0.0
@@ -895,19 +740,28 @@ class Tester1DWidget(QWidget):
 			# put the materials we want to test as the last item
 			materials[parent_component.id] = parent_component
 			
-			# now we can run the tester
+			# build component controls
 			locale = QLocale()
-			self.tester = Tester1D(materials, locale.toDouble(self.lch_value.text())[0], self.strain_hist_time, self.strain_hist.strain)
+			cdata = []
+			for i in range(ssize):
+				tdata = tu.TensorComponentData()
+				if not self.components_strain[i].isChecked():
+					tdata.control = tu.TensorComponentData.STRESS #default = STRAIN
+				if i == self.strain_hist_component_cbox.currentIndex():
+					tdata.type = tu.TensorComponentData.TESTED #default = FIXED
+				tdata.value = locale.toDouble(self.components_values[i].text())[0]
+				cdata.append(tdata)
+			
+			# now we can run the tester
+			self.tester = TesterTIM6D(self.type, materials, cdata, self.strain_hist_time, self.strain_hist.strain)
 			self.tester.testProcessUpdated.connect(self.onTestProcessUpdated)
 			parent_dialog = shiboken2.wrapInstance(self.editor.getParentWindowPtr(), QWidget)
 			parent_dialog.setEnabled(False)
 			self.editor.setCanClose(False)
-			self.data_button.setEnabled(False)
 			try:
 				self.tester.run()
 			finally:
 				parent_dialog.setEnabled(True)
-				self.data_button.setEnabled(True)
 				self.editor.setCanClose(True)
 				self.tester.deleteLater()
 				self.tester = None
@@ -918,21 +772,28 @@ class Tester1DWidget(QWidget):
 	
 	def onDataClicked(self):
 		try:
-			n = len(self.chart_data.x)
+			ssize = TIMTraits.STRAIN_SIZE
+			n = len(self.chart_data[0].x)
 			dialog = QDialog()
 			dialog.setLayout(QVBoxLayout())
 			table = gu.TableWidget()
 			table.setItemDelegate(gu.DoubleItemDelegate(table))
-			table.setColumnCount(2)
-			table.setHorizontalHeaderLabels([self.chart_data.xLabel, self.chart_data.yLabel])
+			table.setColumnCount(2*ssize)
+			labels = []
+			for i in range(ssize):
+				labels.append(self.chart_data[i].xLabel)
+				labels.append(self.chart_data[i].yLabel)
+			table.setHorizontalHeaderLabels(labels)
 			table.setRowCount(n)
 			def make_item(value):
 				iy = QTableWidgetItem()
 				iy.setData(Qt.DisplayRole, value)
 				return iy
 			for i in range(n):
-				table.setItem(i, 0, make_item(self.chart_data.x[i]))
-				table.setItem(i, 1, make_item(self.chart_data.y[i]))
+				for j in range(ssize):
+					cdata = self.chart_data[j]
+					table.setItem(i, j*2, make_item(cdata.x[i]))
+					table.setItem(i, j*2+1, make_item(cdata.y[i]))
 			dialog.layout().addWidget(table)
 			dialog.exec_()
 		except:

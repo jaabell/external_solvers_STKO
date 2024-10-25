@@ -1,5 +1,5 @@
 # enable default 3D tester for this module
-from opensees.physical_properties.utils.tester.EnableTester3D import *
+from opensees.physical_properties.utils.tester.EnableTester1D import *
 from opensees.utils.override_utils import get_function_from_module
 
 import PyMpc.Units as u
@@ -335,12 +335,6 @@ def _check_implex(xobj):
 	xobj.getAttribute('implexErrorTolerance').visible = is_implex and do_check
 	xobj.getAttribute('implexErrorTimeReductionLimit').visible = is_implex and do_check
 
-def _check_cplanes(xobj):
-	cplanes = xobj.getAttribute('-crackPlanes').boolean
-	xobj.getAttribute('nct').visible = cplanes
-	xobj.getAttribute('ncc').visible = cplanes
-	xobj.getAttribute('smoothingAngle').visible = cplanes
-
 def _check_presets(xobj):
 	ptype = xobj.getAttribute('Preset').string
 	check_fun = _globals.presets[ptype][1]
@@ -374,7 +368,6 @@ _onEditBegin = get_function_from_module(__name__, 'onEditBegin')
 def onEditBegin(editor, xobj):
 	if _onEditBegin: _onEditBegin(editor, xobj)
 	_check_implex(xobj)
-	_check_cplanes(xobj)
 	_check_tensile_hl_consistency(xobj, None)
 	_check_compressive_hl_consistency(xobj, None)
 	_check_presets(xobj)
@@ -382,8 +375,6 @@ def onEditBegin(editor, xobj):
 def onAttributeChanged(editor, xobj, attribute_name):
 	if attribute_name == 'integration' or attribute_name == 'implexCheckError':
 		_check_implex(xobj)
-	elif attribute_name == '-crackPlanes':
-		_check_cplanes(xobj)
 	elif attribute_name in _globals.hl_t_targets:
 		_check_tensile_hl_consistency(xobj, xobj.getAttribute(attribute_name))
 	elif attribute_name in _globals.hl_c_targets:
@@ -402,7 +393,7 @@ def makeXObjectMetaData():
 			html_par(html_begin()) +
 			html_par(html_boldtext(name)+'<br/>') + 
 			html_par(descr) +
-			html_par(html_href('https://opensees.github.io/OpenSeesDocumentation/user/manual/material/ndMaterials/ASDConcrete3D.html','ASDConcrete3D')+'<br/>') +
+			html_par(html_href('https://opensees.github.io/OpenSeesDocumentation/user/manual/material/uniaxialMaterials/ASDConcrete1D.html','ASDConcrete1D')+'<br/>') +
 			html_end()
 			)
 		if adim is not None:
@@ -411,21 +402,10 @@ def makeXObjectMetaData():
 			a.setDefault(dval)
 		return a
 	
-	# mass
-	rho = mka("rho", "Mass", "Density", MpcAttributeType.QuantityScalar, adim=((u.F/(u.L/u.t**2))/u.L**3))
 	# elasticity
 	E = mka("E", "Elasticity", "Young's modulus", MpcAttributeType.QuantityScalar, adim=u.F/u.L**2)
-	v = mka("v", "Elasticity", "Poisson's ratio", MpcAttributeType.Real)
 	# viscosity
 	eta  = mka("eta", "Misc", "Viscosity parameter", MpcAttributeType.Real, dval=0.0)
-	# Kc 
-	Kc = mka("Kc", "Misc", ("Triaxial-Compression shape factor.<br/>"
-		"It must be in the range [2/3, 1].<br/>"
-		"The lower the value, the stronger is the material under increasing confinement"), MpcAttributeType.Real, dval=2.0/3.0)
-	# cdf
-	cdf = mka("CDF", "Misc", ("Cross-Damage Factor.<br/>"
-		"It must be in the range [0, inf[.<br/>"
-		"The higher the value, the more the tensile damage will affect the compressive stress in shear"), MpcAttributeType.Real, dval=0.0)
 	# implex
 	algo = mka("integration", "Integration", ("Integration type.<br/>"
 		"(Default) Implicit: A standard Backward-Euler integration scheme.<br/>"
@@ -452,11 +432,6 @@ def makeXObjectMetaData():
 		MpcAttributeType.String, dval="Secant")
 	ctype.sourceType = MpcAttributeSourceType.List
 	ctype.setSourceList(['Tangent', 'Secant'])
-	# crack planes
-	cplanes = mka("-crackPlanes", "Crack Planes", "Activates the anisotropy of internal variables on multiple crack-planes", MpcAttributeType.Boolean, dval=False)
-	cplanes_nct = mka("nct", "Crack Planes", "Number of crack planes for the tensile behavior", MpcAttributeType.Integer, dval=4)
-	cplanes_ncc = mka("ncc", "Crack Planes", "Number of crack planes for the compressive behavior", MpcAttributeType.Integer, dval=4)
-	cplanes_angle = mka("smoothingAngle", "Crack Planes", "Smoothing angle (in degress) for smoothing the internal variables", MpcAttributeType.Real, dval=45.0)
 	
 	# hardening laws - manual (by points) ...
 	Te = mka("Te", "Tension", "Tensile Hardening Law (Strain)", MpcAttributeType.QuantityVector)
@@ -502,14 +477,11 @@ def makeXObjectMetaData():
 	itype.setSourceList(all_presets)
 	
 	xom = MpcXObjectMetaData()
-	xom.name = 'ASDConcrete3D'
+	xom.name = 'ASDConcrete1D'
 	xom.Xgroup = 'ASDEASoftware'
 	
-	# Mass
-	xom.addAttribute(rho)
 	# Elasticity
 	xom.addAttribute(E)
-	xom.addAttribute(v)
 	# Preset
 	xom.addAttribute(itype)
 	xom.addAttribute(ft)
@@ -540,15 +512,8 @@ def makeXObjectMetaData():
 	xom.addAttribute(implex_check)
 	xom.addAttribute(implex_tol)
 	xom.addAttribute(implex_red)
-	# crack planes
-	xom.addAttribute(cplanes)
-	xom.addAttribute(cplanes_nct)
-	xom.addAttribute(cplanes_ncc)
-	xom.addAttribute(cplanes_angle)
 	# misc
 	xom.addAttribute(eta)
-	xom.addAttribute(Kc)
-	xom.addAttribute(cdf)
 	xom.addAttribute(ctype)
 	
 	return xom
@@ -560,11 +525,7 @@ def writeTcl(pinfo):
 	
 	# get basic parameters
 	E = _geta(xobj, 'E').quantityScalar.value
-	v = _geta(xobj, 'v').real
-	rho = _geta(xobj, 'rho').quantityScalar.value
 	eta = _geta(xobj, 'eta').real
-	Kc = _geta(xobj, 'Kc').real
-	cdf = _geta(xobj, 'CDF').real
 	
 	# obtain the hardening points
 	hl_fun = _globals.presets[_geta(xobj, 'Preset').string][0]
@@ -573,15 +534,15 @@ def writeTcl(pinfo):
 		return ' '.join(str(i) for i in x)
 	
 	# command format
-	command = ("{0}nDMaterial ASDConcrete3D {1} {2} {3} \\\n"
-		"{0}\t-Te {6} \\\n"
-		"{0}\t-Ts {7} \\\n"
-		"{0}\t-Td {8} \\\n"
-		"{0}\t-Ce {9} \\\n"
-		"{0}\t-Cs {10} \\\n"
-		"{0}\t-Cd {11} \\\n"
-		"{0}\t-rho {4} -eta {5} -Kc {12} -cdf {13}").format(pinfo.indent, tag, E, v, rho, eta, 
-			to_tcl(Te), to_tcl(Ts), to_tcl(Td), to_tcl(Ce), to_tcl(Cs), to_tcl(Cd), Kc, cdf)
+	command = ("{0}uniaxialMaterial ASDConcrete1D {1} {2} \\\n"
+		"{0}\t-Te {4} \\\n"
+		"{0}\t-Ts {5} \\\n"
+		"{0}\t-Td {6} \\\n"
+		"{0}\t-Ce {7} \\\n"
+		"{0}\t-Cs {8} \\\n"
+		"{0}\t-Cd {9} \\\n"
+		"{0}\t -eta {3}").format(pinfo.indent, tag, E, eta, 
+			to_tcl(Te), to_tcl(Ts), to_tcl(Td), to_tcl(Ce), to_tcl(Cs), to_tcl(Cd))
 	
 	if _geta(xobj, 'integration').string == 'IMPL-EX':
 		#if _geta(xobj, 'implexCheckError').boolean:
@@ -595,12 +556,6 @@ def writeTcl(pinfo):
 		#
 		# Note 1
 		command += ' \\\n{}\t-implex -implexAlpha {}'.format(pinfo.indent, _geta(xobj, 'implexAlpha').real)
-	
-	if _geta(xobj, '-crackPlanes').boolean:
-		command += ' \\\n{}\t-crackPlanes {} {} {}'.format(pinfo.indent, 
-			_geta(xobj, 'nct').integer,
-			_geta(xobj, 'ncc').integer,
-			_geta(xobj, 'smoothingAngle').real)
 	
 	if _geta(xobj, 'constitutiveTensorType').string == 'Tangent':
 		command += ' \\\n{}\t-tangent'.format(pinfo.indent)
