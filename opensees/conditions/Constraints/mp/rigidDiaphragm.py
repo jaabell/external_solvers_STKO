@@ -132,7 +132,7 @@ def ensureNodesOnPartitions(xobj, pmap):
 			for process_id in range(process_count):
 				for slave_counter in range(1, len(elem.nodes)):
 					slave_id = elem.nodes[slave_counter].id
-					if doc.mesh.partitionData.isNodeOnPartition(slave_id, process_id):
+					if doc.mesh.partitionData.isNodeOnParition(slave_id, process_id):
 						if not process_id in master_parts:
 							master_parts.append(process_id)
 
@@ -169,7 +169,7 @@ def __process_rigidDiaphram (doc, pinfo, perpDirn, is_partitioned, all_inter, pr
 						raise Exception('Error: The rigidDiaphragm command works only for problems in 3 ndm and 6 ndf')
 				
 				if is_partitioned:
-					if not doc.mesh.partitionData.isNodeOnPartition(inode_id, process_id):
+					if not doc.mesh.partitionData.isNodeOnParition(inode_id, process_id):
 						continue
 				
 				num_slaves += 1
