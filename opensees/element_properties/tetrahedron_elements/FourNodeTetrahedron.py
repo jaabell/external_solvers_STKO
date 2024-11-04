@@ -60,6 +60,19 @@ def makeXObjectMetaData():
 		)
 	at_b3.dimension = u.F
 	
+	at_doInitDisp = MpcAttributeMetaData()
+	at_doInitDisp.type = MpcAttributeType.Boolean
+	at_doInitDisp.name = '-doInitDisp'
+	at_doInitDisp.group = 'Optional parameters'
+	at_doInitDisp.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('-doInitDisp')+'<br/>') +
+		html_par('If this flag is set to TRUE, the element will consider initial displacements at a reference condition with no strain. Useful for staged-construction analysis') +
+		html_par(html_href('https://opensees.berkeley.edu/wiki/index.php/FourNodeTetrahedron','FourNodeTetrahedron')+'<br/>') +
+		html_end()
+		)
+	at_doInitDisp.dval = False
+	#at_doInitDisp.dimension = None
 	
 	xom = MpcXObjectMetaData()
 	xom.name = 'FourNodeTetrahedron'
@@ -67,12 +80,14 @@ def makeXObjectMetaData():
 	xom.addAttribute(at_b1)
 	xom.addAttribute(at_b2)
 	xom.addAttribute(at_b3)
+	xom.addAttribute(at_doInitDisp)
 	
 	
 	# Optional-dep
 	xom.setVisibilityDependency(at_Optional, at_b1)
 	xom.setVisibilityDependency(at_Optional, at_b2)
 	xom.setVisibilityDependency(at_Optional, at_b3)
+	xom.setVisibilityDependency(at_Optional, at_doInitDisp)
 	
 	
 	return xom
@@ -135,8 +150,13 @@ def writeTcl(pinfo):
 		if(b3_at is None):
 			raise Exception('Error: cannot find "b3" attribute')
 		b3 = b3_at.quantityScalar
+
+		doInitDisp_at = xobj.getAttribute('-doInitDisp')
+		if(doInitDisp_at is None):
+			raise Exception('Error: cannot find "doInitDisp" attribute')
+		doInitDisp = doInitDisp_at.boolean
 		
-		sopt += ' {} {} {}'.format(b1.value, b2.value, b3.value)
+		sopt += ' {} {} {} -doInitDisp {}'.format(b1.value, b2.value, b3.value, int(doInitDisp) )
 	
 	
 	str_tcl = '{}element FourNodeTetrahedron {}{} {}{}\n'.format(pinfo.indent, tag, nstr, matTag, sopt)

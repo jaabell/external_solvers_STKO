@@ -27,6 +27,7 @@ def makeXObjectMetaData():
 	b1 = mka('b1', MpcAttributeType.QuantityScalar, 'Default', 'Body force in X direction', dval = 0.0, dim = u.F/u.L**3)
 	b2 = mka('b2', MpcAttributeType.QuantityScalar, 'Default', 'Body force in Y direction', dval = 0.0, dim = u.F/u.L**3)
 	b3 = mka('b3', MpcAttributeType.QuantityScalar, 'Default', 'Body force in Z direction', dval = 0.0, dim = u.F/u.L**3)
+	doInitDisp = mka('-doInitDisp', MpcAttributeType.Boolean, 'Default', 'If this flag is set to TRUE, the element will consider initial displacements at a reference condition with no strain. Useful for staged-construction analysis', dval = False, dim = None)
 	
 	xom = MpcXObjectMetaData()
 	xom.name = 'TenNodeTetrahedron'
@@ -34,11 +35,13 @@ def makeXObjectMetaData():
 	xom.addAttribute(b1)
 	xom.addAttribute(b2)
 	xom.addAttribute(b3)
+	xom.addAttribute(doInitDisp)
 	
 	# Optional-dep
 	xom.setVisibilityDependency(body_forces, b1)
 	xom.setVisibilityDependency(body_forces, b2)
 	xom.setVisibilityDependency(body_forces, b3)
+	xom.setVisibilityDependency(body_forces, doInitDisp)
 	
 	return xom
 
@@ -84,7 +87,8 @@ def writeTcl(pinfo):
 		b1 = geta('b1').quantityScalar.value
 		b2 = geta('b2').quantityScalar.value
 		b3 = geta('b3').quantityScalar.value
-		sopt = '{} {} {}'.format(b1, b2, b3)
+		doInitDisp = geta('-doInitDisp').boolean
+		sopt = '{} {} {} -doInitDisp {}'.format(b1, b2, b3, int(doInitDisp))
 	
 	# command
 	str_tcl = '{}element TenNodeTetrahedron {} {} {} {}\n'.format(pinfo.indent, tag, nstr, matTag, sopt)
