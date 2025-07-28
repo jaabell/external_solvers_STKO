@@ -65,7 +65,7 @@ def integratorCommand(xom):
 	at_transientIntegrators.sourceType = MpcAttributeSourceType.List
 	at_transientIntegrators.setSourceList(['Central Difference', 'Newmark Method', 'Hilber-Hughes-Taylor Method', 'Generalized Alpha Method', 'TRBDF2',
 									   'Explicit Difference', 'AlphaOS_TP', 'AlphaOSGeneralized_TP', 'HHT_TP', 'HHTExplicit_TP', 'HHTGeneralizedExplicit_TP', 'KRAlphaExplicit_TP',
-									   'Newmark Explicit'])
+									   'Newmark Explicit', 'Explicit Bathe'])
 	at_transientIntegrators.setDefault('Central Difference')
 	
 	#-------------------------------------------------Static Integrators-------------------------------------------------
@@ -1325,6 +1325,50 @@ def integratorCommand(xom):
 	#------------------------------------------------Explicit Difference----------------------------------------
 	
 	# integrator Explicitdifference
+
+	#-----------------------------------------------------------------------------------------------------------
+	#------------------------------------------------Explicit Bathe----------------------------------------
+	
+	# integrator ExplicitBathe
+	# Newmark
+	at_Bathe = MpcAttributeMetaData()
+	at_Bathe.type = MpcAttributeType.Boolean
+	at_Bathe.name = 'Explicit Bathe'
+	at_Bathe.group = 'integrator'
+	at_Bathe.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('Explicit Bathe')+'<br/>') + 
+		html_par('Newmark Method') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
+		html_end()
+		)
+	at_Bathe.editable = False
+	
+	# p
+	at_p = MpcAttributeMetaData()
+	at_p.type = MpcAttributeType.Real
+	at_p.name = 'p/ExplicitBathe'
+	at_p.group = 'integrator'
+	at_p.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('p')+'<br/>') +
+		html_par('p factor') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
+		html_end()
+		)
+	
+	# beta
+	at_compute_critical_timestep = MpcAttributeMetaData()
+	at_compute_critical_timestep.type = MpcAttributeType.Integer
+	at_compute_critical_timestep.name = 'compute_critical_timestep/ExplicitBathe'
+	at_compute_critical_timestep.group = 'integrator'
+	at_compute_critical_timestep.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('compute_critical_timestep')+'<br/>') +
+		html_par('compute_critical_timestep factor') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
+		html_end()
+		)
 	
 	#-----------------------------------------------------------------------------------------------------------
 	#
@@ -1467,6 +1511,12 @@ def integratorCommand(xom):
 	# KRAlphaExplicit_TP
 	xom.addAttribute(at_KRA)
 	xom.addAttribute(at_rhoInf_KRA)
+
+	# ExplicitBathe
+	xom.addAttribute(at_Bathe)
+	xom.addAttribute(at_p)
+	xom.addAttribute(at_compute_critical_timestep)
+
 
 	# Static Integrators
 	# Integrator Command Dependency
@@ -1744,6 +1794,13 @@ def integratorCommand(xom):
 	xom.setVisibilityDependency(at_KRA, at_rhoInf_KRA)
 	xom.setVisibilityDependency(at_booleanTransientIntegrators, at_rhoInf_KRA)
 
+	# Explicit Bathe
+	xom.setVisibilityDependency(at_Bathe, at_p)
+	xom.setVisibilityDependency(at_booleanTransientIntegrators, at_p)
+	
+	xom.setVisibilityDependency(at_Bathe, at_compute_critical_timestep)
+	xom.setVisibilityDependency(at_booleanTransientIntegrators, at_compute_critical_timestep)
+
 	# auto-exclusive dependencies
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_Newmark)
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_NewmarkExplicit)
@@ -1755,6 +1812,7 @@ def integratorCommand(xom):
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_HHTExplicit_TP)
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_HHTGE)
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_KRA)
+	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_Bathe)
 
 def writeTcl_integrator(pinfo, xobj):
 	
@@ -2053,6 +2111,15 @@ def writeTcl_integrator(pinfo, xobj):
 		# ----------------- Explicit Difference -----------------
 		elif transientIntegrators == 'Explicit Difference':
 			str_tcl = '{}integrator ExplicitDifference\n'.format(pinfo.indent)
+
+		# ----------------- Explicit Bathe -----------------
+		elif transientIntegrators == 'Explicit Bathe':
+			# gamma
+			p = geta('p/ExplicitBathe').real
+			# beta
+			compute_critical_timestep = geta('compute_critical_timestep/ExplicitBathe').integer
+		
+			str_tcl = '{}integrator ExplicitBathe {} {}\n'.format(pinfo.indent, p, compute_critical_timestep)
 		
 	# now write the string into the file
 	pinfo.out_file.write(str_tcl)

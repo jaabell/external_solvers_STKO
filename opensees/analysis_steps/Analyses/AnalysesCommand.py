@@ -74,7 +74,7 @@ def makeXObjectMetaData():
 class _myglobals:
 	integrators_with_adaptive = ['Load Control', 'Displacement Control', 'Parallel Displacement Control', 'Arc-Length Control', 'EQPath', 'HSConstraint'
 	,'Newmark Method', 'Hilber-Hughes-Taylor Method', 'Generalized Alpha Method', 'AlphaOS_TP', 'AlphaOSGeneralized_TP', 'TRBDF2']
-	integrators_no_test = ['Explicit Difference', 'KRAlphaExplicit_TP', 'HHTGeneralizedExplicit_TP', 'HHT_TP', 'HHTExplicit_TP', 'Central Difference', 'Newmark Explicit']
+	integrators_no_test = ['Explicit Difference', 'KRAlphaExplicit_TP', 'HHTGeneralizedExplicit_TP', 'HHT_TP', 'HHTExplicit_TP', 'Central Difference', 'Newmark Explicit','Explicit Bathe']
 
 def onAttributeChanged(editor, xobj, attribute_name):
 	'''
@@ -634,6 +634,11 @@ def writeTcl(pinfo):
 			integrator_type = 'KRAlphaExplicit_TP'
 			rhoInf_KRAlphaExplicit_TP = geta('rhoInf/KRAlphaExplicit_TP').real
 			more_int_data= '{}'.format(rhoInf_KRAlphaExplicit_TP)
+		elif transientIntegrators == 'Explicit Bathe':
+			integrator_type = 'ExplicitBathe'
+			p = geta('p/ExplicitBathe').real
+			compute_critical_timestep = geta('compute_critical_timestep/ExplicitBathe').integer
+			more_int_data= '{} {}'.format(p, compute_critical_timestep)
 		WriteTransientTemplate(more_int_data)
 	
 	pinfo.out_file.write('\n')
