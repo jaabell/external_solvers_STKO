@@ -259,7 +259,7 @@ def writeTcl(pinfo):
 	el = _geta(xobj, 'Elasticity').string
 	yf = _geta(xobj, 'Yield Function').string
 	pf = _geta(xobj, 'Plastic Flow').string
-	ss.write('{0}nDMaterial ASDPlasticMaterial {1} \\\n{0}{5}{2}_YF \\\n{0}{5}{3}_PF \\\n{0}{5}{4}_EL \\\n'.format(pinfo.indent, tag, yf, pf, el, pinfo.tabIndent))
+	ss.write('{0}nDMaterial ASDPlasticMaterial3D {1} \\\n{0}{5}{2}_YF \\\n{0}{5}{3}_PF \\\n{0}{5}{4}_EL \\\n'.format(pinfo.indent, tag, yf, pf, el, pinfo.tabIndent))
 	
 	# build the IV_TYPE string
 	YF = js['YF']
