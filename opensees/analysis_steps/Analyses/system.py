@@ -79,6 +79,69 @@ def systemCommand(xom, group_suffix=''):
 	at_LVALUE.setDefault(10)
 	
 	'''
+	Diagonal
+	'''
+	# Diagonal
+	at_Diagonal = MpcAttributeMetaData()
+	at_Diagonal.type = MpcAttributeType.Boolean
+	at_Diagonal.name = 'Diagonal'
+	at_Diagonal.group = group
+	at_Diagonal.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('Diagonal')+'<br/>') + 
+		html_par('') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Diagonal','Diagonal')+'<br/>') +
+		html_end()
+		)
+	at_Diagonal.editable = False
+	
+	# -lumped
+	at_Diagonal_Lumped = MpcAttributeMetaData()
+	at_Diagonal_Lumped.type = MpcAttributeType.Boolean
+	at_Diagonal_Lumped.name = '-lumped'
+	at_Diagonal_Lumped.group = group
+	at_Diagonal_Lumped.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('-lumped')+'<br/>') + 
+		html_par('') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Diagonal','Diagonal')+'<br/>') +
+		html_end()
+		)
+	at_Diagonal_Lumped.setDefault(True)
+
+	'''
+	MPIDiagonal
+	'''
+	# MPIDiagonal
+	at_MPIDiagonal = MpcAttributeMetaData()
+	at_MPIDiagonal.type = MpcAttributeType.Boolean
+	at_MPIDiagonal.name = 'MPIDiagonal'
+	at_MPIDiagonal.group = group
+	at_MPIDiagonal.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('MPIDiagonal')+'<br/>') + 
+		html_par('') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/MPIDiagonal','MPIDiagonal')+'<br/>') +
+		html_end()
+		)
+	at_MPIDiagonal.editable = False
+	
+	# -lumped
+	at_MPIDiagonal_Lumped = MpcAttributeMetaData()
+	at_MPIDiagonal_Lumped.type = MpcAttributeType.Boolean
+	at_MPIDiagonal_Lumped.name = 'MPI -lumped'
+	at_MPIDiagonal_Lumped.group = group
+	at_MPIDiagonal_Lumped.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('-lumped')+'<br/>') + 
+		html_par('') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/MPIDiagonal','MPIDiagonal')+'<br/>') +
+		html_end()
+		)
+	at_MPIDiagonal_Lumped.setDefault(True)
+
+
+	'''
 	Mumps
 	'''
 	# Mumps
@@ -242,7 +305,10 @@ def systemCommand(xom, group_suffix=''):
 	xom.addAttribute(at_MINT)
 	xom.addAttribute(at_PRE)
 	xom.addAttribute(at_SOLVER)
-	
+	xom.addAttribute(at_Diagonal)
+	xom.addAttribute(at_Diagonal_Lumped)
+	xom.addAttribute(at_MPIDiagonal)
+	xom.addAttribute(at_MPIDiagonal_Lumped)	
 	
 	# visibility dependencies
 	
@@ -266,6 +332,11 @@ def systemCommand(xom, group_suffix=''):
 	xom.setVisibilityDependency(at_Cusp, at_MINT)
 	xom.setVisibilityDependency(at_Cusp, at_PRE)
 	xom.setVisibilityDependency(at_Cusp, at_SOLVER)
+
+	# Diagonal
+	xom.setVisibilityDependency(at_Diagonal, at_Diagonal_Lumped)
+	xom.setVisibilityDependency(at_MPIDiagonal, at_MPIDiagonal_Lumped)
+
 	
 	
 	# auto-exclusive dependencies
@@ -273,6 +344,8 @@ def systemCommand(xom, group_suffix=''):
 	xom.setBooleanAutoExclusiveDependency(at_system, at_UmfPack)
 	xom.setBooleanAutoExclusiveDependency(at_system, at_Mumps)
 	xom.setBooleanAutoExclusiveDependency(at_system, at_Cusp)
+	xom.setBooleanAutoExclusiveDependency(at_system, at_Diagonal)
+	xom.setBooleanAutoExclusiveDependency(at_system, at_MPIDiagonal)
 	
 	return xom
 	
@@ -332,10 +405,29 @@ def writeTcl_system(pinfo, xobj):
 		str_tcl = '{}system SparseSYM\n'.format(pinfo.indent)
 	
 	elif system == 'Diagonal':
-		str_tcl = '{}system Diagonal\n'.format(pinfo.indent)
+		lumped_at = xobj.getAttribute('-lumped')
+		if(lumped_at is None):
+				raise Exception('Error: cannot find "-lumped" attribute')
+		lumped = lumped_at.boolean
+		if not lumped:
+			str_tcl = '{}system Diagonal\n'.format(pinfo.indent)
+		else:
+			str_tcl = '{}system Diagonal -lumped\n'.format(pinfo.indent)
 	
 	elif system == 'MPIDiagonal':
-		str_tcl = '{}system MPIDiagonal\n'.format(pinfo.indent)
+		lumped_at = xobj.getAttribute('MPI -lumped')
+		if(lumped_at is None):
+				raise Exception('Error: cannot find "MPI -lumped" attribute')
+		lumped = lumped_at.boolean
+
+		print(f"{lumped_at = } {lumped = }")
+
+		if not lumped:
+			str_tcl = '{}system MPIDiagonal\n'.format(pinfo.indent)
+		else:
+			str_tcl = '{}system MPIDiagonal -lumped\n'.format(pinfo.indent)
+
+		print(f"  !!!!!!!   {str_tcl=}")
 	
 	elif system == 'Mumps':
 		ICNTL14_at = xobj.getAttribute('-ICNTL14')
