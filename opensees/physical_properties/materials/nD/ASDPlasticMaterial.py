@@ -204,7 +204,7 @@ def makeXObjectMetaData():
 	yretu.setSourceList(['Disabled', 'One_Step_Return', 'Iterative_Return'])
 	integration_method = mka('integration_method', 'Integration Options', 'Integration method', MpcAttributeType.String, dval='Runge_Kutta_45_Error_Control')
 	integration_method.sourceType = MpcAttributeSourceType.List
-	integration_method.setSourceList(['Forward_Euler', 'Forward_Euler_Subincrement', 'Runge_Kutta_45_Error_Control'])
+	integration_method.setSourceList(['Forward_Euler', 'Forward_Euler_Subincrement', 'Runge_Kutta_45_Error_Control', 'Modified_Euler_Error_Control', 'Backward_Euler'])
 	tangent_type = mka('tangent_type', 'Integration Options', 'Tangent type', MpcAttributeType.String, dval='Elastic')
 	tangent_type.sourceType = MpcAttributeSourceType.List
 	tangent_type.setSourceList(['Elastic', 'Continuum', 'Secant', 'Numerical_Algorithmic_FirstOrder','Numerical_Algorithmic_SecondOrder'])
@@ -259,7 +259,7 @@ def writeTcl(pinfo):
 	el = _geta(xobj, 'Elasticity').string
 	yf = _geta(xobj, 'Yield Function').string
 	pf = _geta(xobj, 'Plastic Flow').string
-	ss.write('{0}nDMaterial ASDPlasticMaterial {1} \\\n{0}{5}{2}_YF \\\n{0}{5}{3}_PF \\\n{0}{5}{4}_EL \\\n'.format(pinfo.indent, tag, yf, pf, el, pinfo.tabIndent))
+	ss.write('{0}nDMaterial ASDPlasticMaterial3D {1} \\\n{0}{5}{2}_YF \\\n{0}{5}{3}_PF \\\n{0}{5}{4}_EL \\\n'.format(pinfo.indent, tag, yf, pf, el, pinfo.tabIndent))
 	
 	# build the IV_TYPE string
 	YF = js['YF']
