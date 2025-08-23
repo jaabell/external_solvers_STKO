@@ -92,6 +92,30 @@ def makeTesterLabel():
 	label.setWordWrap(True)
 	return label
 
+
+# creates the default label for all tester widgets
+def makeGeotechTesterLabel():
+	label = QLabel(
+		'<html><head/><body>'
+		'<p align="center"><span style=" font-size:11pt; color:#003399;">'
+		'Geotechnical Material Test'
+		'</span></p>'
+		'<p align="center"><span style=" color:#000000;">'
+		'Here you can test your geotechnical material. '
+		'After defining material parameters, choose a strain history and run the test! '
+		'Material response will show in the chart below.'
+		'</span></p>'
+		'<p align="center"><span style=" font-weight:600; font-style:italic; color:#000000;">'
+		'Note'
+		'</span>'
+		'<span style=" font-style:italic; color:#000000;">'
+		': to run the test you need to have at least one external solver kit properly set up.'
+		'</span></p>'
+		'</body></html>'
+		)
+	label.setWordWrap(True)
+	return label
+
 # custom double item delegate
 class DoubleItemDelegate(QStyledItemDelegate):
 	def __init__(self, parent=None):

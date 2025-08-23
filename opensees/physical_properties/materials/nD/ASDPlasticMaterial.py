@@ -1,5 +1,7 @@
 # enable default 3D tester for this module
-from opensees.physical_properties.utils.tester.EnableTester3D import *
+# from opensees.physical_properties.utils.tester.EnableTester3D import *
+from opensees.physical_properties.utils.tester.EnableTesterGeotechnical import *
+
 from opensees.utils.override_utils import get_function_from_module
 
 import PyMpc.Units as u

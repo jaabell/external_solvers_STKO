@@ -74,7 +74,7 @@ def makeXObjectMetaData():
 class _myglobals:
 	integrators_with_adaptive = ['Load Control', 'Displacement Control', 'Parallel Displacement Control', 'Arc-Length Control', 'EQPath', 'HSConstraint'
 	,'Newmark Method', 'Hilber-Hughes-Taylor Method', 'Generalized Alpha Method', 'AlphaOS_TP', 'AlphaOSGeneralized_TP', 'TRBDF2']
-	integrators_no_test = ['Explicit Difference', 'KRAlphaExplicit_TP', 'HHTGeneralizedExplicit_TP', 'HHT_TP', 'HHTExplicit_TP', 'Central Difference', 'Newmark Explicit','Explicit Bathe']
+	integrators_no_test = ['Explicit Difference', 'KRAlphaExplicit_TP', 'HHTGeneralizedExplicit_TP', 'HHT_TP', 'HHTExplicit_TP', 'Central Difference', 'Newmark Explicit','Explicit Bathe','Explicit Bathe LNVD']
 
 def onAttributeChanged(editor, xobj, attribute_name):
 	'''
@@ -639,6 +639,12 @@ def writeTcl(pinfo):
 			p = geta('p/ExplicitBathe').real
 			compute_critical_timestep = geta('compute_critical_timestep/ExplicitBathe').integer
 			more_int_data= '{} {}'.format(p, compute_critical_timestep)
+		elif transientIntegrators == 'Explicit Bathe LNVD':
+			integrator_type = 'ExplicitBatheLNVD'
+			p = geta('p/ExplicitBatheLNVD').real
+			compute_critical_timestep = geta('compute_critical_timestep/ExplicitBatheLNVD').integer
+			LNVDamping = geta('LNVDamping/ExplicitBatheLNVD').integer
+			more_int_data= '{} {} {}'.format(p, compute_critical_timestep, LNVDamping)
 		WriteTransientTemplate(more_int_data)
 	
 	pinfo.out_file.write('\n')

@@ -65,7 +65,7 @@ def integratorCommand(xom):
 	at_transientIntegrators.sourceType = MpcAttributeSourceType.List
 	at_transientIntegrators.setSourceList(['Central Difference', 'Newmark Method', 'Hilber-Hughes-Taylor Method', 'Generalized Alpha Method', 'TRBDF2',
 									   'Explicit Difference', 'AlphaOS_TP', 'AlphaOSGeneralized_TP', 'HHT_TP', 'HHTExplicit_TP', 'HHTGeneralizedExplicit_TP', 'KRAlphaExplicit_TP',
-									   'Newmark Explicit', 'Explicit Bathe'])
+									   'Newmark Explicit', 'Explicit Bathe', 'Explicit Bathe LNVD'])
 	at_transientIntegrators.setDefault('Central Difference')
 	
 	#-------------------------------------------------Static Integrators-------------------------------------------------
@@ -1330,7 +1330,6 @@ def integratorCommand(xom):
 	#------------------------------------------------Explicit Bathe----------------------------------------
 	
 	# integrator ExplicitBathe
-	# Newmark
 	at_Bathe = MpcAttributeMetaData()
 	at_Bathe.type = MpcAttributeType.Boolean
 	at_Bathe.name = 'Explicit Bathe'
@@ -1338,11 +1337,13 @@ def integratorCommand(xom):
 	at_Bathe.description = (
 		html_par(html_begin()) +
 		html_par(html_boldtext('Explicit Bathe')+'<br/>') + 
-		html_par('Newmark Method') +
+		html_par('An explicit integrator with enhanced numerical damping') +
 		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
 		html_end()
 		)
 	at_Bathe.editable = False
+
+
 	
 	# p
 	at_p = MpcAttributeMetaData()
@@ -1352,12 +1353,13 @@ def integratorCommand(xom):
 	at_p.description = (
 		html_par(html_begin()) +
 		html_par(html_boldtext('p')+'<br/>') +
-		html_par('p factor') +
+		html_par('p factor. The step size of the intermediate step in the ExplicitBathe integrator. Use 0.54 typically .') +
 		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
 		html_end()
 		)
 	
-	# beta
+
+	# compute_critical_timestep
 	at_compute_critical_timestep = MpcAttributeMetaData()
 	at_compute_critical_timestep.type = MpcAttributeType.Integer
 	at_compute_critical_timestep.name = 'compute_critical_timestep/ExplicitBathe'
@@ -1365,11 +1367,66 @@ def integratorCommand(xom):
 	at_compute_critical_timestep.description = (
 		html_par(html_begin()) +
 		html_par(html_boldtext('compute_critical_timestep')+'<br/>') +
-		html_par('compute_critical_timestep factor') +
+		html_par('0 or 1. 1 displays a rough estimate of the critical timestep on screen. The estimate is based on the eigenvalue analysis of all elements in the domain. ') +
 		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
 		html_end()
 		)
 	
+	# integrator ExplicitBathe LNVD
+	at_Bathe_LNVD = MpcAttributeMetaData()
+	at_Bathe_LNVD.type = MpcAttributeType.Boolean
+	at_Bathe_LNVD.name = 'Explicit Bathe LNVD'
+	at_Bathe_LNVD.group = 'integrator'
+	at_Bathe_LNVD.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('Explicit Bathe LNVD')+'<br/>') + 
+		html_par('Explicit bathe + Local Non Viscous Damping (LNVD), which is useful to both damp out high frequencies (small numeric damping) and very useful for quasi-static analysis based on the dynamic relaxation method. ') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
+		html_end()
+		)
+	at_Bathe_LNVD.editable = False
+
+	# LNVDamping
+	at_LNVDamping = MpcAttributeMetaData()
+	at_LNVDamping.type = MpcAttributeType.Real
+	at_LNVDamping.name = 'LNVDamping/ExplicitBatheLNVD'
+	at_LNVDamping.group = 'integrator'
+	at_LNVDamping.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('LNVDamping')+'<br/>') +
+		html_par('LNVDamping factor. At each DOF it applies an artificial force proportional to the magnitude of the local unbalanced force and opposite the current velocity’s sign. This removes kinetic energy without biasing the final equilibrium. ') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe LNVDamping')+'<br/>') +
+		html_end()
+		)
+		
+	# p
+	at_p2 = MpcAttributeMetaData()
+	at_p2.type = MpcAttributeType.Real
+	at_p2.name = 'p/ExplicitBatheLNVD'
+	at_p2.group = 'integrator'
+	at_p2.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('p')+'<br/>') +
+		html_par('p factor. The step size of the intermediate step in the ExplicitBathe integrator. Use 0.54 typically .') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
+		html_end()
+		)
+	
+
+	# compute_critical_timestep
+	at_compute_critical_timestep2 = MpcAttributeMetaData()
+	at_compute_critical_timestep2.type = MpcAttributeType.Integer
+	at_compute_critical_timestep2.name = 'compute_critical_timestep/ExplicitBatheLNVD'
+	at_compute_critical_timestep2.group = 'integrator'
+	at_compute_critical_timestep2.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('compute_critical_timestep')+'<br/>') +
+		html_par('0 or 1. 1 displays a rough estimate of the critical timestep on screen. The estimate is based on the eigenvalue analysis of all elements in the domain. ') +
+		html_par(html_href('http://opensees.berkeley.edu/wiki/index.php/Newmark_Method','Explicit Bathe')+'<br/>') +
+		html_end()
+		)
+	
+
 	#-----------------------------------------------------------------------------------------------------------
 	#
 	#
@@ -1516,7 +1573,11 @@ def integratorCommand(xom):
 	xom.addAttribute(at_Bathe)
 	xom.addAttribute(at_p)
 	xom.addAttribute(at_compute_critical_timestep)
-
+	
+	xom.addAttribute(at_Bathe_LNVD)
+	xom.addAttribute(at_LNVDamping)
+	xom.addAttribute(at_p2)
+	xom.addAttribute(at_compute_critical_timestep2)
 
 	# Static Integrators
 	# Integrator Command Dependency
@@ -1800,6 +1861,16 @@ def integratorCommand(xom):
 	
 	xom.setVisibilityDependency(at_Bathe, at_compute_critical_timestep)
 	xom.setVisibilityDependency(at_booleanTransientIntegrators, at_compute_critical_timestep)
+	
+	# Explicit Bathe LNVD
+	xom.setVisibilityDependency(at_Bathe_LNVD, at_p2)
+	xom.setVisibilityDependency(at_booleanTransientIntegrators, at_p2)
+	
+	xom.setVisibilityDependency(at_Bathe_LNVD, at_compute_critical_timestep2)
+	xom.setVisibilityDependency(at_booleanTransientIntegrators, at_compute_critical_timestep2)
+
+	xom.setVisibilityDependency(at_Bathe_LNVD, at_LNVDamping)
+	xom.setVisibilityDependency(at_booleanTransientIntegrators, at_LNVDamping)
 
 	# auto-exclusive dependencies
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_Newmark)
@@ -1813,6 +1884,7 @@ def integratorCommand(xom):
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_HHTGE)
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_KRA)
 	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_Bathe)
+	xom.setBooleanAutoExclusiveDependency(at_transientIntegrators, at_Bathe_LNVD)
 
 def writeTcl_integrator(pinfo, xobj):
 	
@@ -1980,6 +2052,8 @@ def writeTcl_integrator(pinfo, xobj):
 	# ----------------- transientIntegrators -----------------
 		transientIntegrators = geta('transientIntegrators').string
 		
+		print(f"{transientIntegrators = }")
+
 		# ----------------- Central Difference -----------------
 		if transientIntegrators == 'Central Difference':
 			str_tcl = '{}integrator CentralDifference\n'.format(pinfo.indent)
@@ -2120,6 +2194,16 @@ def writeTcl_integrator(pinfo, xobj):
 			compute_critical_timestep = geta('compute_critical_timestep/ExplicitBathe').integer
 		
 			str_tcl = '{}integrator ExplicitBathe {} {}\n'.format(pinfo.indent, p, compute_critical_timestep)
+
+				# ----------------- Explicit Bathe LNVD -----------------
+		elif transientIntegrators == 'Explicit Bathe LNVD':
+			p = geta('p/ExplicitBatheLNVD').real
+			compute_critical_timestep = geta('compute_critical_timestep/ExplicitBatheLNVD').integer
+			LNVDamping = geta('LNVDamping/ExplicitBatheLNVD').real
+		
+			str_tcl = '{}integrator ExplicitBathe {} {} {}\n'.format(pinfo.indent, p, compute_critical_timestep, LNVDamping)
+
+			print(f"{str_tcl = }")
 		
 	# now write the string into the file
 	pinfo.out_file.write(str_tcl)
