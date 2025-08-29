@@ -51,14 +51,17 @@
             "parameters": {},
             "variables": {
                 "BackStress": "tensor",
-                "VonMisesRadius": "scalar"
+                "YieldStress": "scalar"
             }
         },
         "DruckerPrager": {
-            "parameters": {},
+            "parameters": {
+                "DP_xi_c": 0.0,
+                "DP_eta": 0.0
+            },
             "variables": {
                 "BackStress": "tensor",
-                "VonMisesRadius": "scalar"
+                "DP_cohesion": "scalar"
             }
         },
         "MohrCoulomb": {
@@ -85,10 +88,12 @@
             }
         },
         "DruckerPrager": {
-            "parameters": {},
+            "parameters": {
+                "DP_etabar": 0.0
+            },
             "variables": {
                 "BackStress": "tensor",
-                "VonMisesRadius": "scalar"
+                "DP_cohesion": "scalar"
             }
         },
         "ConstantDilatancy": {
@@ -104,7 +109,7 @@
                 "MC_c": 0,
                 "MC_phi": 30.0,
                 "MC_ds": 0.001,
-                "Dilatancy": 0
+                "MC_psi": 0
             },
             "variables": {
             	"BackStress": "tensor"

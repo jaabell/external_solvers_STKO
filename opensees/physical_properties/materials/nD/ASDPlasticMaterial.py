@@ -1,6 +1,6 @@
 # enable default 3D tester for this module
-# from opensees.physical_properties.utils.tester.EnableTester3D import *
-from opensees.physical_properties.utils.tester.EnableTesterGeotechnical import *
+from opensees.physical_properties.utils.tester.EnableTester3D import *
+# from opensees.physical_properties.utils.tester.EnableTesterGeotechnical import *
 
 from opensees.utils.override_utils import get_function_from_module
 
@@ -206,7 +206,7 @@ def makeXObjectMetaData():
 	yretu.setSourceList(['Disabled', 'One_Step_Return', 'Iterative_Return'])
 	integration_method = mka('integration_method', 'Integration Options', 'Integration method', MpcAttributeType.String, dval='Runge_Kutta_45_Error_Control')
 	integration_method.sourceType = MpcAttributeSourceType.List
-	integration_method.setSourceList(['Forward_Euler', 'Forward_Euler_Subincrement', 'Runge_Kutta_45_Error_Control', 'Modified_Euler_Error_Control', 'Backward_Euler'])
+	integration_method.setSourceList(['Forward_Euler', 'Forward_Euler_Subincrement', 'Runge_Kutta_45_Error_Control', 'Modified_Euler_Error_Control', 'Backward_Euler', 'Backward_Euler_LineSearch'])
 	tangent_type = mka('tangent_type', 'Integration Options', 'Tangent type', MpcAttributeType.String, dval='Elastic')
 	tangent_type.sourceType = MpcAttributeSourceType.List
 	tangent_type.setSourceList(['Elastic', 'Continuum', 'Secant', 'Numerical_Algorithmic_FirstOrder','Numerical_Algorithmic_SecondOrder'])
