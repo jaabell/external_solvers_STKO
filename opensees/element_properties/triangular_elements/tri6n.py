@@ -95,6 +95,19 @@ def makeXObjectMetaData():
 	at_b2.setDefault(0.0)
 	at_b2.dimension = u.F
 
+	at_doInit = MpcAttributeMetaData()
+	at_doInit.type = MpcAttributeType.Boolean
+	at_doInit.name = 'doInit'
+	at_doInit.group = 'Optional parameters'
+	at_doInit.description = (
+		html_par(html_begin()) +
+		html_par(html_boldtext('doInit') + '<br/>') +
+		html_par('Whether to consider initial displacements on element creation') +
+		html_end()
+	)
+	at_doInit.setDefault(0.0)
+	at_doInit.dimension = u.F
+
 	xom = MpcXObjectMetaData()
 	xom.name = 'tri6n'
 	xom.addAttribute(at_thick)
@@ -104,11 +117,13 @@ def makeXObjectMetaData():
 	xom.addAttribute(at_rho)
 	xom.addAttribute(at_b1)
 	xom.addAttribute(at_b2)
+	xom.addAttribute(at_doInit)
 
 	xom.setVisibilityDependency(at_Optional, at_pressure)
 	xom.setVisibilityDependency(at_Optional, at_rho)
 	xom.setVisibilityDependency(at_Optional, at_b1)
 	xom.setVisibilityDependency(at_Optional, at_b2)
+	xom.setVisibilityDependency(at_Optional, at_doInit)
 
 	return xom
 
@@ -152,8 +167,9 @@ def writeTcl(pinfo):
 		rho = xobj.getAttribute('rho').quantityScalar.value
 		b1 = xobj.getAttribute('b1').quantityScalar.value
 		b2 = xobj.getAttribute('b2').quantityScalar.value
-		sopt = ' {} {} {} {}'.format(pressure, rho, b1, b2)
+		doInit = xobj.getAttribute('doInit').boolean
+		sopt = ' {} {} {} {} -doInitDisp {}'.format(pressure, rho, b1, b2, int(doInit))
 
 	# write tcl
-	pinfo.out_file.write('{}element tri6n {} {} {} {} {}\n'.format(
-		pinfo.indent, tag, node_str, thick.value, type, matTag) + sopt + '\n')
+	pinfo.out_file.write('{}element tri6n {} {} {} {} {} {}\n'.format(
+		pinfo.indent, tag, node_str, thick.value, type, matTag, sopt) + '\n')
